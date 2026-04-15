@@ -4,7 +4,7 @@ import { Search, Filter, X } from "lucide-react";
 import { matches, allTeams, allStadiums, allStages } from "@/lib/match-data";
 import { MatchCard } from "@/components/MatchCard";
 
-export const Route = createFileRoute("/matches")({
+export const Route = createFileRoute("/matches/")({
   head: () => ({
     meta: [
       { title: "Match Schedule — FIFA World Cup 2026 Tickets" },
