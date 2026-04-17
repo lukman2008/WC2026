@@ -17,14 +17,19 @@ interface CoinbaseCharge {
   pricing: { local: { amount: string; currency: string } };
 }
 
+type ChargeResult =
+  | { ok: true; hostedUrl: string; chargeCode: string; total: number }
+  | { ok: false; error: string };
+
 export const createCryptoCharge = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => createChargeInput.parse(input))
-  .handler(async ({ data, context }) => {
+  .handler(async ({ data, context }): Promise<ChargeResult> => {
+    try {
     const { userId } = context;
     const apiKey = process.env.COINBASE_COMMERCE_API_KEY;
     if (!apiKey) {
-      throw new Error("Crypto payments are not configured (missing API key).");
+      return { ok: false, error: "Crypto payments are not configured (missing API key)." };
     }
 
     // Look up match for pricing + name
@@ -35,7 +40,7 @@ export const createCryptoCharge = createServerFn({ method: "POST" })
       .maybeSingle();
 
     if (matchErr || !match) {
-      throw new Error("Match not found");
+      return { ok: false, error: "Match not found" };
     }
 
     const priceMap = {
@@ -50,7 +55,7 @@ export const createCryptoCharge = createServerFn({ method: "POST" })
     };
 
     if (availMap[data.category] < data.quantity) {
-      throw new Error(`Only ${availMap[data.category]} ${data.category} tickets left.`);
+      return { ok: false, error: `Only ${availMap[data.category]} ${data.category} tickets left.` };
     }
 
     const total = +(priceMap[data.category] * data.quantity).toFixed(2);
@@ -83,7 +88,7 @@ export const createCryptoCharge = createServerFn({ method: "POST" })
     if (!res.ok) {
       const errBody = await res.text();
       console.error("Coinbase charge creation failed:", res.status, errBody);
-      throw new Error("Failed to create crypto charge. Please try again.");
+      return { ok: false, error: `Coinbase error (${res.status}): ${errBody.slice(0, 200)}` };
     }
 
     const { data: charge } = (await res.json()) as { data: CoinbaseCharge };
@@ -104,12 +109,18 @@ export const createCryptoCharge = createServerFn({ method: "POST" })
 
     if (insertErr) {
       console.error("Failed to persist pending purchase:", insertErr);
-      throw new Error("Could not initialize checkout. Please try again.");
+      return { ok: false, error: "Could not initialize checkout. Please try again." };
     }
 
     return {
+      ok: true,
       hostedUrl: charge.hosted_url,
       chargeCode: charge.code,
       total,
     };
+    } catch (e) {
+      console.error("createCryptoCharge unexpected error:", e);
+      const msg = e instanceof Error ? e.message : "Unexpected error creating charge.";
+      return { ok: false, error: msg };
+    }
   });
