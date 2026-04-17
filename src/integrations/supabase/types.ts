@@ -77,6 +77,72 @@ export type Database = {
         }
         Relationships: []
       }
+      pending_purchases: {
+        Row: {
+          category: Database["public"]["Enums"]["ticket_category"]
+          coinbase_charge_code: string
+          coinbase_charge_id: string
+          created_at: string
+          currency: string
+          hosted_url: string
+          id: string
+          match_id: string
+          quantity: number
+          status: Database["public"]["Enums"]["pending_purchase_status"]
+          total_amount: number
+          transaction_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          category: Database["public"]["Enums"]["ticket_category"]
+          coinbase_charge_code: string
+          coinbase_charge_id: string
+          created_at?: string
+          currency?: string
+          hosted_url: string
+          id?: string
+          match_id: string
+          quantity: number
+          status?: Database["public"]["Enums"]["pending_purchase_status"]
+          total_amount: number
+          transaction_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          category?: Database["public"]["Enums"]["ticket_category"]
+          coinbase_charge_code?: string
+          coinbase_charge_id?: string
+          created_at?: string
+          currency?: string
+          hosted_url?: string
+          id?: string
+          match_id?: string
+          quantity?: number
+          status?: Database["public"]["Enums"]["pending_purchase_status"]
+          total_amount?: number
+          transaction_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pending_purchases_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "matches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pending_purchases_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -258,6 +324,7 @@ export type Database = {
         | "Semi-Final"
         | "Third Place"
         | "Final"
+      pending_purchase_status: "pending" | "completed" | "expired" | "failed"
       ticket_category: "vip" | "regular" | "economy"
       ticket_status: "active" | "used" | "cancelled"
       transaction_status: "pending" | "succeeded" | "failed" | "refunded"
@@ -397,6 +464,7 @@ export const Constants = {
         "Third Place",
         "Final",
       ],
+      pending_purchase_status: ["pending", "completed", "expired", "failed"],
       ticket_category: ["vip", "regular", "economy"],
       ticket_status: ["active", "used", "cancelled"],
       transaction_status: ["pending", "succeeded", "failed", "refunded"],
