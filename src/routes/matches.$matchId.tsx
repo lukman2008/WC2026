@@ -180,15 +180,15 @@ function MatchDetailPage() {
             </div>
 
             <div className="flex items-center justify-center gap-8 sm:gap-12 py-6">
-              <div className="flex flex-col items-center gap-2">
-                <span className="text-5xl sm:text-6xl">{match.home_flag}</span>
+              <div className="flex flex-col items-center gap-3">
+                <Flag team={match.home_team} fallbackEmoji={match.home_flag} size={56} />
                 <span className="text-lg font-bold text-foreground">{match.home_team}</span>
               </div>
               <div className="flex flex-col items-center">
                 <span className="text-sm font-bold text-muted-foreground tracking-widest">VS</span>
               </div>
-              <div className="flex flex-col items-center gap-2">
-                <span className="text-5xl sm:text-6xl">{match.away_flag}</span>
+              <div className="flex flex-col items-center gap-3">
+                <Flag team={match.away_team} fallbackEmoji={match.away_flag} size={56} />
                 <span className="text-lg font-bold text-foreground">{match.away_team}</span>
               </div>
             </div>
@@ -299,7 +299,36 @@ function MatchDetailPage() {
               </div>
             </div>
 
-            <div className="mt-6 rounded-lg bg-secondary/50 p-4 space-y-2">
+            {/* Payment method */}
+            <div className="mt-6">
+              <label className="text-sm font-medium text-foreground">Payment method</label>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPaymentMethod("crypto")}
+                  className={`flex flex-col items-center gap-1.5 rounded-lg border p-3 transition-all ${
+                    paymentMethod === "crypto" ? "border-primary bg-primary/5 shadow-glow-primary" : "border-border hover:border-muted-foreground/30"
+                  }`}
+                >
+                  <Bitcoin className="h-5 w-5 text-primary" />
+                  <span className="text-xs font-semibold text-foreground">Crypto</span>
+                  <span className="text-[10px] text-muted-foreground">BTC · ETH · USDC</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPaymentMethod("mock")}
+                  className={`flex flex-col items-center gap-1.5 rounded-lg border p-3 transition-all ${
+                    paymentMethod === "mock" ? "border-primary bg-primary/5 shadow-glow-primary" : "border-border hover:border-muted-foreground/30"
+                  }`}
+                >
+                  <CreditCard className="h-5 w-5 text-primary" />
+                  <span className="text-xs font-semibold text-foreground">Card (demo)</span>
+                  <span className="text-[10px] text-muted-foreground">Instant mock</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-5 rounded-lg bg-secondary/50 p-4 space-y-2">
               <div className="flex items-center justify-between text-sm text-muted-foreground">
                 <span>{categoryInfo[category].label} × {quantity}</span>
                 <span>${pricePerTicket} each</span>
@@ -315,13 +344,19 @@ function MatchDetailPage() {
               disabled={purchasing || available === 0}
               className="mt-5 w-full inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-primary px-6 py-3.5 text-sm font-bold text-primary-foreground shadow-glow-primary transition-all hover:opacity-90 hover:scale-[1.01] active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              {purchasing ? <Loader2 className="h-4 w-4 animate-spin" /> : <CreditCard className="h-4 w-4" />}
-              {purchasing ? "Processing..." : user ? `Buy Tickets — $${total.toLocaleString()}` : "Sign in to Buy"}
+              {purchasing ? <Loader2 className="h-4 w-4 animate-spin" /> : paymentMethod === "crypto" ? <Bitcoin className="h-4 w-4" /> : <CreditCard className="h-4 w-4" />}
+              {purchasing
+                ? "Processing..."
+                : !user
+                  ? "Sign in to Buy"
+                  : paymentMethod === "crypto"
+                    ? `Pay with Crypto — $${total.toLocaleString()}`
+                    : `Buy Tickets — $${total.toLocaleString()}`}
             </button>
 
             <div className="mt-4 flex items-center justify-center gap-2 text-xs text-muted-foreground">
               <ShieldCheck className="h-3.5 w-3.5" />
-              <span>Secure checkout · Mock payment (demo)</span>
+              <span>{paymentMethod === "crypto" ? "Secure crypto checkout via Coinbase Commerce" : "Secure checkout · Mock payment (demo)"}</span>
             </div>
           </motion.div>
         </div>
