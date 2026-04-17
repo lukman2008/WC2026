@@ -4,6 +4,7 @@ import { Ticket, ArrowRight, Loader2, MapPin, Calendar, QrCode, CheckCircle2, XC
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { motion } from "framer-motion";
+import { Flag } from "@/components/Flag";
 
 interface TicketRow {
   id: string;
@@ -119,12 +120,12 @@ function MyTicketsPage() {
 
                   <div className="flex items-center gap-4 mb-4">
                     <div className="flex items-center gap-2">
-                      <span className="text-3xl">{t.matches.home_flag}</span>
+                      <Flag team={t.matches.home_team} fallbackEmoji={t.matches.home_flag} size={28} />
                       <span className="font-bold text-foreground">{t.matches.home_team}</span>
                     </div>
                     <span className="text-xs text-muted-foreground">VS</span>
                     <div className="flex items-center gap-2">
-                      <span className="text-3xl">{t.matches.away_flag}</span>
+                      <Flag team={t.matches.away_team} fallbackEmoji={t.matches.away_flag} size={28} />
                       <span className="font-bold text-foreground">{t.matches.away_team}</span>
                     </div>
                   </div>
