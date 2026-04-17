@@ -1,6 +1,5 @@
-import { createFileRoute, useEffect as _, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
-import { useMemo } from "react";
+import { createFileRoute } from "@tanstack/react-router";
+import { useEffect, useMemo, useState } from "react";
 import { Search, Filter, X, Loader2 } from "lucide-react";
 import { MatchCard } from "@/components/MatchCard";
 import { supabase } from "@/integrations/supabase/client";
