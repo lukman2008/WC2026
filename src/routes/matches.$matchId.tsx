@@ -96,6 +96,10 @@ function MatchDetailPage() {
             origin: window.location.origin,
           },
         });
+        if (!result.ok) {
+          toast.error(result.error);
+          return;
+        }
         toast.success("Redirecting to crypto checkout…");
         window.location.href = result.hostedUrl;
         return;
