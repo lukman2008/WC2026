@@ -1,0 +1,40 @@
+// Maps team / country names used in the app to ISO 3166-1 alpha-2 codes
+// used by `country-flag-icons` for SVG flag rendering.
+export const teamToCountryCode: Record<string, string> = {
+  Brazil: "BR",
+  Argentina: "AR",
+  France: "FR",
+  Germany: "DE",
+  Spain: "ES",
+  England: "GB", // country-flag-icons uses GB for England
+  Portugal: "PT",
+  Netherlands: "NL",
+  Italy: "IT",
+  Belgium: "BE",
+  Japan: "JP",
+  "South Korea": "KR",
+  USA: "US",
+  Mexico: "MX",
+  Canada: "CA",
+  Morocco: "MA",
+  Senegal: "SN",
+  Nigeria: "NG",
+  Ghana: "GH",
+  Cameroon: "CM",
+  Australia: "AU",
+  "Saudi Arabia": "SA",
+  Uruguay: "UY",
+  Croatia: "HR",
+  Colombia: "CO",
+  Ecuador: "EC",
+  Switzerland: "CH",
+  Denmark: "DK",
+  Serbia: "RS",
+  Poland: "PL",
+  Tunisia: "TN",
+  "Costa Rica": "CR",
+};
+
+export function getTeamCountryCode(teamName: string): string | null {
+  return teamToCountryCode[teamName] ?? null;
+}

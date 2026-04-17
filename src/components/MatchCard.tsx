@@ -3,6 +3,7 @@ import { MapPin, Calendar, Clock, Ticket } from "lucide-react";
 import { motion } from "framer-motion";
 import type { Match } from "@/lib/match-data";
 import { CountdownTimer } from "./CountdownTimer";
+import { Flag } from "./Flag";
 
 export function MatchCard({ match, index = 0 }: { match: Match; index?: number }) {
   const totalAvailable = match.ticketsAvailable.vip + match.ticketsAvailable.regular + match.ticketsAvailable.economy;
@@ -39,15 +40,15 @@ export function MatchCard({ match, index = 0 }: { match: Match; index?: number }
 
         {/* Teams */}
         <div className="flex items-center justify-center gap-5 px-5 py-5">
-          <div className="flex flex-col items-center gap-1.5 min-w-[80px]">
-            <span className="text-3xl">{match.homeFlag}</span>
+          <div className="flex flex-col items-center gap-2 min-w-[80px]">
+            <Flag team={match.homeTeam} fallbackEmoji={match.homeFlag} size={32} />
             <span className="text-sm font-semibold text-foreground">{match.homeTeam}</span>
           </div>
           <div className="flex flex-col items-center gap-0.5">
             <span className="text-xs font-bold text-muted-foreground tracking-widest">VS</span>
           </div>
-          <div className="flex flex-col items-center gap-1.5 min-w-[80px]">
-            <span className="text-3xl">{match.awayFlag}</span>
+          <div className="flex flex-col items-center gap-2 min-w-[80px]">
+            <Flag team={match.awayTeam} fallbackEmoji={match.awayFlag} size={32} />
             <span className="text-sm font-semibold text-foreground">{match.awayTeam}</span>
           </div>
         </div>
