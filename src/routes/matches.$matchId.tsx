@@ -1,11 +1,16 @@
-import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, MapPin, Calendar, Clock, Ticket, ShieldCheck, Minus, Plus, CreditCard, Loader2 } from "lucide-react";
+import { ArrowLeft, MapPin, Calendar, Clock, Ticket, ShieldCheck, Minus, Plus, CreditCard, Loader2, Bitcoin } from "lucide-react";
 import { CountdownTimer } from "@/components/CountdownTimer";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { Flag } from "@/components/Flag";
+import { useServerFn } from "@tanstack/react-start";
+import { createCryptoCharge } from "@/utils/coinbase.functions";
+
+type PaymentMethod = "mock" | "crypto";
 
 type Category = "vip" | "regular" | "economy";
 
@@ -53,6 +58,8 @@ function MatchDetailPage() {
   const [category, setCategory] = useState<Category>("regular");
   const [quantity, setQuantity] = useState(1);
   const [purchasing, setPurchasing] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("crypto");
+  const createCharge = useServerFn(createCryptoCharge);
 
   const loadMatch = async () => {
     const { data, error } = await supabase
@@ -80,6 +87,21 @@ function MatchDetailPage() {
     if (!match) return;
     setPurchasing(true);
     try {
+      if (paymentMethod === "crypto") {
+        const result = await createCharge({
+          data: {
+            matchId: match.id,
+            category,
+            quantity,
+            origin: window.location.origin,
+          },
+        });
+        toast.success("Redirecting to crypto checkout…");
+        window.location.href = result.hostedUrl;
+        return;
+      }
+
+      // Mock card path (existing behavior)
       const { data, error } = await supabase.rpc("purchase_tickets", {
         _user_id: user.id,
         _match_id: match.id,
@@ -96,7 +118,8 @@ function MatchDetailPage() {
       });
       navigate({ to: "/my-tickets" });
     } catch (e) {
-      toast.error("Purchase failed. Please try again.");
+      const msg = e instanceof Error ? e.message : "Purchase failed. Please try again.";
+      toast.error(msg);
     } finally {
       setPurchasing(false);
     }
