@@ -9,14 +9,26 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as MyTicketsRouteImport } from './routes/my-tickets'
+import { Route as AuthRouteImport } from './routes/auth'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as MatchesIndexRouteImport } from './routes/matches.index'
 import { Route as MatchesMatchIdRouteImport } from './routes/matches.$matchId'
 
+const ProfileRoute = ProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const MyTicketsRoute = MyTicketsRouteImport.update({
   id: '/my-tickets',
   path: '/my-tickets',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -37,45 +49,86 @@ const MatchesMatchIdRoute = MatchesMatchIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
   '/my-tickets': typeof MyTicketsRoute
+  '/profile': typeof ProfileRoute
   '/matches/$matchId': typeof MatchesMatchIdRoute
   '/matches/': typeof MatchesIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
   '/my-tickets': typeof MyTicketsRoute
+  '/profile': typeof ProfileRoute
   '/matches/$matchId': typeof MatchesMatchIdRoute
   '/matches': typeof MatchesIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
   '/my-tickets': typeof MyTicketsRoute
+  '/profile': typeof ProfileRoute
   '/matches/$matchId': typeof MatchesMatchIdRoute
   '/matches/': typeof MatchesIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/my-tickets' | '/matches/$matchId' | '/matches/'
+  fullPaths:
+    | '/'
+    | '/auth'
+    | '/my-tickets'
+    | '/profile'
+    | '/matches/$matchId'
+    | '/matches/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/my-tickets' | '/matches/$matchId' | '/matches'
-  id: '__root__' | '/' | '/my-tickets' | '/matches/$matchId' | '/matches/'
+  to:
+    | '/'
+    | '/auth'
+    | '/my-tickets'
+    | '/profile'
+    | '/matches/$matchId'
+    | '/matches'
+  id:
+    | '__root__'
+    | '/'
+    | '/auth'
+    | '/my-tickets'
+    | '/profile'
+    | '/matches/$matchId'
+    | '/matches/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AuthRoute: typeof AuthRoute
   MyTicketsRoute: typeof MyTicketsRoute
+  ProfileRoute: typeof ProfileRoute
   MatchesMatchIdRoute: typeof MatchesMatchIdRoute
   MatchesIndexRoute: typeof MatchesIndexRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/profile': {
+      id: '/profile'
+      path: '/profile'
+      fullPath: '/profile'
+      preLoaderRoute: typeof ProfileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/my-tickets': {
       id: '/my-tickets'
       path: '/my-tickets'
       fullPath: '/my-tickets'
       preLoaderRoute: typeof MyTicketsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -104,19 +157,12 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AuthRoute: AuthRoute,
   MyTicketsRoute: MyTicketsRoute,
+  ProfileRoute: ProfileRoute,
   MatchesMatchIdRoute: MatchesMatchIdRoute,
   MatchesIndexRoute: MatchesIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-  }
-}
