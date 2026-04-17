@@ -17,14 +17,19 @@ interface CoinbaseCharge {
   pricing: { local: { amount: string; currency: string } };
 }
 
+type ChargeResult =
+  | { ok: true; hostedUrl: string; chargeCode: string; total: number }
+  | { ok: false; error: string };
+
 export const createCryptoCharge = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => createChargeInput.parse(input))
-  .handler(async ({ data, context }) => {
+  .handler(async ({ data, context }): Promise<ChargeResult> => {
+    try {
     const { userId } = context;
     const apiKey = process.env.COINBASE_COMMERCE_API_KEY;
     if (!apiKey) {
-      throw new Error("Crypto payments are not configured (missing API key).");
+      return { ok: false, error: "Crypto payments are not configured (missing API key)." };
     }
 
     // Look up match for pricing + name
