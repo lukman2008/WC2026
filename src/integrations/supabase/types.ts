@@ -14,6 +14,84 @@ export type Database = {
   }
   public: {
     Tables: {
+      crypto_payments: {
+        Row: {
+          category: Database["public"]["Enums"]["ticket_category"]
+          chain: Database["public"]["Enums"]["crypto_chain"]
+          confirmations: number
+          created_at: string
+          crypto_amount: number
+          deposit_address: string
+          error_message: string | null
+          expires_at: string
+          id: string
+          match_id: string
+          quantity: number
+          rate_usd_per_unit: number
+          status: Database["public"]["Enums"]["crypto_payment_status"]
+          transaction_id: string | null
+          tx_hash: string | null
+          updated_at: string
+          usd_amount: number
+          user_id: string
+        }
+        Insert: {
+          category: Database["public"]["Enums"]["ticket_category"]
+          chain: Database["public"]["Enums"]["crypto_chain"]
+          confirmations?: number
+          created_at?: string
+          crypto_amount: number
+          deposit_address: string
+          error_message?: string | null
+          expires_at: string
+          id?: string
+          match_id: string
+          quantity: number
+          rate_usd_per_unit: number
+          status?: Database["public"]["Enums"]["crypto_payment_status"]
+          transaction_id?: string | null
+          tx_hash?: string | null
+          updated_at?: string
+          usd_amount: number
+          user_id: string
+        }
+        Update: {
+          category?: Database["public"]["Enums"]["ticket_category"]
+          chain?: Database["public"]["Enums"]["crypto_chain"]
+          confirmations?: number
+          created_at?: string
+          crypto_amount?: number
+          deposit_address?: string
+          error_message?: string | null
+          expires_at?: string
+          id?: string
+          match_id?: string
+          quantity?: number
+          rate_usd_per_unit?: number
+          status?: Database["public"]["Enums"]["crypto_payment_status"]
+          transaction_id?: string | null
+          tx_hash?: string | null
+          updated_at?: string
+          usd_amount?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crypto_payments_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "matches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crypto_payments_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       matches: {
         Row: {
           available_economy: number
@@ -295,6 +373,13 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      complete_crypto_payment: {
+        Args: { _payment_id: string }
+        Returns: {
+          ticket_codes: string[]
+          transaction_id: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -317,6 +402,14 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "user"
+      crypto_chain: "btc" | "eth"
+      crypto_payment_status:
+        | "awaiting_payment"
+        | "submitted"
+        | "confirming"
+        | "completed"
+        | "failed"
+        | "expired"
       match_stage:
         | "Group Stage"
         | "Round of 16"
@@ -456,6 +549,15 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "user"],
+      crypto_chain: ["btc", "eth"],
+      crypto_payment_status: [
+        "awaiting_payment",
+        "submitted",
+        "confirming",
+        "completed",
+        "failed",
+        "expired",
+      ],
       match_stage: [
         "Group Stage",
         "Round of 16",
