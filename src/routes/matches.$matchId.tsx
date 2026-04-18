@@ -345,11 +345,20 @@ function MatchDetailPage() {
 
             <div className="mt-4 flex items-center justify-center gap-2 text-xs text-muted-foreground">
               <ShieldCheck className="h-3.5 w-3.5" />
-              <span>{paymentMethod === "crypto" ? "Secure crypto checkout via Coinbase Commerce" : "Secure checkout · Mock payment (demo)"}</span>
+              <span>{paymentMethod === "crypto" ? "On-chain BTC or ETH · Verified via Mempool.space & Alchemy" : "Secure checkout · Mock payment (demo)"}</span>
             </div>
           </motion.div>
         </div>
       </div>
+
+      <CryptoCheckoutDialog
+        open={cryptoOpen}
+        onClose={() => setCryptoOpen(false)}
+        matchId={match.id}
+        category={category}
+        quantity={quantity}
+        usdTotal={total}
+      />
     </div>
   );
 }
