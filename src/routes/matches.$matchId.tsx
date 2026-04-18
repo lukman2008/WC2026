@@ -7,8 +7,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Flag } from "@/components/Flag";
-import { useServerFn } from "@tanstack/react-start";
-import { createCryptoCharge } from "@/utils/coinbase.functions";
+import { CryptoCheckoutDialog } from "@/components/CryptoCheckoutDialog";
 
 type PaymentMethod = "mock" | "crypto";
 
@@ -59,7 +58,7 @@ function MatchDetailPage() {
   const [quantity, setQuantity] = useState(1);
   const [purchasing, setPurchasing] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("crypto");
-  const createCharge = useServerFn(createCryptoCharge);
+  const [cryptoOpen, setCryptoOpen] = useState(false);
 
   const loadMatch = async () => {
     const { data, error } = await supabase
@@ -85,26 +84,12 @@ function MatchDetailPage() {
       return;
     }
     if (!match) return;
+    if (paymentMethod === "crypto") {
+      setCryptoOpen(true);
+      return;
+    }
     setPurchasing(true);
     try {
-      if (paymentMethod === "crypto") {
-        const result = await createCharge({
-          data: {
-            matchId: match.id,
-            category,
-            quantity,
-            origin: window.location.origin,
-          },
-        });
-        if (!result.ok) {
-          toast.error(result.error);
-          return;
-        }
-        toast.success("Redirecting to crypto checkout…");
-        window.location.href = result.hostedUrl;
-        return;
-      }
-
       // Mock card path (existing behavior)
       const { data, error } = await supabase.rpc("purchase_tickets", {
         _user_id: user.id,
