@@ -1,7 +1,18 @@
-import { createServerFn } from "@tanstack/react-start";
+import { createServerFn, createMiddleware } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { supabase } from "@/integrations/supabase/client";
 import { z } from "zod";
+
+// Client middleware: attach the current user's Supabase access token so the
+// server-side requireSupabaseAuth middleware can authenticate the request.
+const attachAuthHeader = createMiddleware({ type: "function" }).client(async ({ next }) => {
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
+  return next({
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+});
 
 const createChargeInput = z.object({
   matchId: z.string().uuid(),
@@ -22,7 +33,7 @@ type ChargeResult =
   | { ok: false; error: string };
 
 export const createCryptoCharge = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([attachAuthHeader, requireSupabaseAuth])
   .inputValidator((input: unknown) => createChargeInput.parse(input))
   .handler(async ({ data, context }): Promise<ChargeResult> => {
     try {
