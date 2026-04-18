@@ -16,7 +16,6 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as MatchesIndexRouteImport } from './routes/matches.index'
 import { Route as MatchesMatchIdRouteImport } from './routes/matches.$matchId'
 import { Route as CheckoutSuccessRouteImport } from './routes/checkout.success'
-import { Route as ApiCoinbaseWebhookRouteImport } from './routes/api.coinbase-webhook'
 
 const ProfileRoute = ProfileRouteImport.update({
   id: '/profile',
@@ -53,18 +52,12 @@ const CheckoutSuccessRoute = CheckoutSuccessRouteImport.update({
   path: '/checkout/success',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiCoinbaseWebhookRoute = ApiCoinbaseWebhookRouteImport.update({
-  id: '/api/coinbase-webhook',
-  path: '/api/coinbase-webhook',
-  getParentRoute: () => rootRouteImport,
-} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/my-tickets': typeof MyTicketsRoute
   '/profile': typeof ProfileRoute
-  '/api/coinbase-webhook': typeof ApiCoinbaseWebhookRoute
   '/checkout/success': typeof CheckoutSuccessRoute
   '/matches/$matchId': typeof MatchesMatchIdRoute
   '/matches/': typeof MatchesIndexRoute
@@ -74,7 +67,6 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/my-tickets': typeof MyTicketsRoute
   '/profile': typeof ProfileRoute
-  '/api/coinbase-webhook': typeof ApiCoinbaseWebhookRoute
   '/checkout/success': typeof CheckoutSuccessRoute
   '/matches/$matchId': typeof MatchesMatchIdRoute
   '/matches': typeof MatchesIndexRoute
@@ -85,7 +77,6 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/my-tickets': typeof MyTicketsRoute
   '/profile': typeof ProfileRoute
-  '/api/coinbase-webhook': typeof ApiCoinbaseWebhookRoute
   '/checkout/success': typeof CheckoutSuccessRoute
   '/matches/$matchId': typeof MatchesMatchIdRoute
   '/matches/': typeof MatchesIndexRoute
@@ -97,7 +88,6 @@ export interface FileRouteTypes {
     | '/auth'
     | '/my-tickets'
     | '/profile'
-    | '/api/coinbase-webhook'
     | '/checkout/success'
     | '/matches/$matchId'
     | '/matches/'
@@ -107,7 +97,6 @@ export interface FileRouteTypes {
     | '/auth'
     | '/my-tickets'
     | '/profile'
-    | '/api/coinbase-webhook'
     | '/checkout/success'
     | '/matches/$matchId'
     | '/matches'
@@ -117,7 +106,6 @@ export interface FileRouteTypes {
     | '/auth'
     | '/my-tickets'
     | '/profile'
-    | '/api/coinbase-webhook'
     | '/checkout/success'
     | '/matches/$matchId'
     | '/matches/'
@@ -128,7 +116,6 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   MyTicketsRoute: typeof MyTicketsRoute
   ProfileRoute: typeof ProfileRoute
-  ApiCoinbaseWebhookRoute: typeof ApiCoinbaseWebhookRoute
   CheckoutSuccessRoute: typeof CheckoutSuccessRoute
   MatchesMatchIdRoute: typeof MatchesMatchIdRoute
   MatchesIndexRoute: typeof MatchesIndexRoute
@@ -185,13 +172,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CheckoutSuccessRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/coinbase-webhook': {
-      id: '/api/coinbase-webhook'
-      path: '/api/coinbase-webhook'
-      fullPath: '/api/coinbase-webhook'
-      preLoaderRoute: typeof ApiCoinbaseWebhookRouteImport
-      parentRoute: typeof rootRouteImport
-    }
   }
 }
 
@@ -200,7 +180,6 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   MyTicketsRoute: MyTicketsRoute,
   ProfileRoute: ProfileRoute,
-  ApiCoinbaseWebhookRoute: ApiCoinbaseWebhookRoute,
   CheckoutSuccessRoute: CheckoutSuccessRoute,
   MatchesMatchIdRoute: MatchesMatchIdRoute,
   MatchesIndexRoute: MatchesIndexRoute,
