@@ -209,9 +209,9 @@ export const verifyCryptoPayment = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => verifyInput.parse(input))
   .handler(async ({ data, context }): Promise<VerifyApiResult> => {
     try {
-      const { userId } = context;
+      const { userId, supabase: db } = context;
 
-      const { data: payment, error: pErr } = await supabaseAdmin
+      const { data: payment, error: pErr } = await db
         .from("crypto_payments")
         .select("*")
         .eq("id", data.paymentId)
@@ -221,20 +221,20 @@ export const verifyCryptoPayment = createServerFn({ method: "POST" })
 
       // Idempotent completion
       if (payment.status === "completed" && payment.transaction_id) {
-        const { data: tickets } = await supabaseAdmin
+        const { data: tickets } = await db
           .from("tickets")
           .select("ticket_code")
           .eq("transaction_id", payment.transaction_id);
-        return { ok: true, status: "completed", ticketCodes: (tickets || []).map(t => t.ticket_code) };
+        return { ok: true, status: "completed", ticketCodes: (tickets || []).map((t: { ticket_code: string }) => t.ticket_code) };
       }
 
       if (new Date(payment.expires_at).getTime() < Date.now() && payment.status === "awaiting_payment") {
-        await supabaseAdmin.from("crypto_payments").update({ status: "expired" }).eq("id", payment.id);
+        await db.from("crypto_payments").update({ status: "expired" }).eq("id", payment.id);
         return { ok: false, error: "Payment window expired. Please start a new payment." };
       }
 
-      // Reject hash already used by a different payment
-      const { data: dupe } = await supabaseAdmin
+      // Reject hash already used by a different payment of this user
+      const { data: dupe } = await db
         .from("crypto_payments")
         .select("id")
         .eq("chain", payment.chain)
@@ -262,7 +262,7 @@ export const verifyCryptoPayment = createServerFn({ method: "POST" })
       const needed = MIN_CONFIRMATIONS[chain];
       const newStatus = verify.confirmations >= needed ? "confirming" : "submitted";
 
-      await supabaseAdmin.from("crypto_payments").update({
+      await db.from("crypto_payments").update({
         tx_hash: data.txHash,
         confirmations: verify.confirmations,
         status: newStatus,
@@ -272,11 +272,11 @@ export const verifyCryptoPayment = createServerFn({ method: "POST" })
         return { ok: true, status: "confirming", confirmations: verify.confirmations, needed };
       }
 
-      // Complete: issue tickets
-      const { data: complete, error: cErr } = await supabaseAdmin.rpc("complete_crypto_payment", { _payment_id: payment.id });
+      // Complete: issue tickets (SECURITY DEFINER RPC)
+      const { data: complete, error: cErr } = await db.rpc("complete_crypto_payment", { _payment_id: payment.id });
       if (cErr) {
         console.error("complete_crypto_payment failed:", cErr);
-        await supabaseAdmin.from("crypto_payments").update({ status: "failed", error_message: cErr.message }).eq("id", payment.id);
+        await db.from("crypto_payments").update({ status: "failed", error_message: cErr.message }).eq("id", payment.id);
         return { ok: false, error: cErr.message };
       }
       const codes = complete?.[0]?.ticket_codes ?? [];
