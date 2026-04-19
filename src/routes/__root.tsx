@@ -46,11 +46,14 @@ export const Route = createRootRoute({
   notFoundComponent: NotFoundComponent,
 });
 
+const themeInitScript = `(function(){try{var t=localStorage.getItem('theme');var c=t==='light'?'light':'dark';var r=document.documentElement;r.classList.remove('light','dark');r.classList.add(c);}catch(e){}})();`;
+
 function RootShell({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className="dark">
       <head>
         <HeadContent />
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
       <body>
         {children}

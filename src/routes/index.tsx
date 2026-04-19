@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { Trophy, Ticket, MapPin, ArrowRight, Shield, Zap, Globe, Loader2 } from "lucide-react";
 import { MatchCard } from "@/components/MatchCard";
 import { CountdownTimer } from "@/components/CountdownTimer";
+import { Testimonials } from "@/components/Testimonials";
 import { supabase } from "@/integrations/supabase/client";
 import type { Match } from "@/lib/match-data";
 
