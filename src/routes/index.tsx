@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { Trophy, Ticket, MapPin, ArrowRight, Shield, Zap, Globe, Loader2 } from "lucide-react";
 import { MatchCard } from "@/components/MatchCard";
 import { CountdownTimer } from "@/components/CountdownTimer";
+import { Testimonials } from "@/components/Testimonials";
 import { supabase } from "@/integrations/supabase/client";
 import type { Match } from "@/lib/match-data";
 
@@ -152,6 +153,8 @@ function HomePage() {
           </section>
         </>
       )}
+
+      <Testimonials />
 
       <section className="py-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
