@@ -141,9 +141,9 @@ export const createCryptoPayment = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => createInput.parse(input))
   .handler(async ({ data, context }): Promise<CreateResult> => {
     try {
-      const { userId } = context;
+      const { userId, supabase: db } = context;
 
-      const { data: match, error: matchErr } = await supabaseAdmin
+      const { data: match, error: matchErr } = await db
         .from("matches")
         .select("price_vip, price_regular, price_economy, available_vip, available_regular, available_economy")
         .eq("id", data.matchId)
@@ -162,7 +162,7 @@ export const createCryptoPayment = createServerFn({ method: "POST" })
       const depositAddress = getDepositAddress(data.chain);
       const expiresAt = new Date(Date.now() + PAYMENT_TTL_MS).toISOString();
 
-      const { data: row, error: insErr } = await supabaseAdmin
+      const { data: row, error: insErr } = await db
         .from("crypto_payments")
         .insert({
           user_id: userId,
