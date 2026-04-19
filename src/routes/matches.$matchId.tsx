@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, MapPin, Calendar, Clock, Ticket, ShieldCheck, Minus, Plus, CreditCard, Loader2, Bitcoin } from "lucide-react";
+import { ArrowLeft, MapPin, Calendar, Clock, Ticket, ShieldCheck, Minus, Plus, Loader2, Bitcoin } from "lucide-react";
 import { CountdownTimer } from "@/components/CountdownTimer";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
