@@ -103,16 +103,49 @@ function Marquee({ items, duration, reverse = false }: { items: Testimonial[]; d
 }
 
 function LivePurchaseTicker() {
+  const [purchases, setPurchases] = useState<Purchase[]>(fallbackPurchases);
   const [idx, setIdx] = useState(0);
 
   useEffect(() => {
-    const id = setInterval(() => {
-      setIdx(i => (i + 1) % recentPurchases.length);
-    }, 3500);
-    return () => clearInterval(id);
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase.rpc("get_recent_purchases", { _limit: 20 });
+      if (!cancelled && data && data.length > 0) {
+        setPurchases(data as Purchase[]);
+        setIdx(0);
+      }
+    })();
+
+    const channel = supabase
+      .channel("recent-purchases")
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "tickets" }, async () => {
+        const { data } = await supabase.rpc("get_recent_purchases", { _limit: 20 });
+        if (!cancelled && data && data.length > 0) {
+          setPurchases(data as Purchase[]);
+          setIdx(0);
+        }
+      })
+      .subscribe();
+
+    return () => {
+      cancelled = true;
+      supabase.removeChannel(channel);
+    };
   }, []);
 
-  const current = recentPurchases[idx];
+  useEffect(() => {
+    if (purchases.length <= 1) return;
+    const id = setInterval(() => {
+      setIdx(i => (i + 1) % purchases.length);
+    }, 3500);
+    return () => clearInterval(id);
+  }, [purchases.length]);
+
+  const current = purchases[idx];
+  if (!current) return null;
+  const categoryLabel = current.category.charAt(0).toUpperCase() + current.category.slice(1);
+  const matchLabel = `${current.home_team} vs ${current.away_team} · ${categoryLabel}`;
+  const flagCountry = current.country || current.home_team;
 
   return (
     <div className="mb-10 flex justify-center">
