@@ -2,6 +2,19 @@ import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Quote, Sparkles, Ticket } from "lucide-react";
 import { Flag } from "./Flag";
+import { supabase } from "@/integrations/supabase/client";
+
+interface Purchase {
+  ticket_id: string;
+  created_at: string;
+  category: "vip" | "regular" | "economy";
+  display_name: string;
+  country: string | null;
+  home_team: string;
+  away_team: string;
+  home_flag: string;
+  away_flag: string;
+}
 
 interface Testimonial {
   name: string;
