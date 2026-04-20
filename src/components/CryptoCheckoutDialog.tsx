@@ -87,7 +87,8 @@ export function CryptoCheckoutDialog({ open, onClose, matchId, category, quantit
 
   const handleVerify = async () => {
     if (!payment) return;
-    if (!txHash.trim()) { toast.error("Paste your transaction hash"); return; }
+    const trimmed = txHash.trim();
+    if (trimmed.length < 10) { toast.error("Enter a valid transaction hash (at least 10 characters)"); return; }
     setVerifying(true);
     setPendingMsg(null);
     try {
