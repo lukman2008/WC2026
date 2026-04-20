@@ -34,15 +34,11 @@ const testimonials: Testimonial[] = [
   { name: "Aïsha Diallo", country: "Senegal", quote: "Smooth ETH payment for Canada vs Senegal. My family back home is so excited.", rating: 5 },
 ];
 
-const recentPurchases: { name: string; country: string; match: string }[] = [
-  { name: "Carlos M.", country: "Argentina", match: "France vs Argentina · VIP" },
-  { name: "Hannah K.", country: "Germany", match: "Brazil vs Germany · Regular" },
-  { name: "Liam O.", country: "USA", match: "USA vs England · VIP" },
-  { name: "Ines G.", country: "Portugal", match: "Portugal vs Italy · Regular" },
-  { name: "Kenji S.", country: "Japan", match: "Mexico vs Japan · Economy" },
-  { name: "Ahmed B.", country: "Morocco", match: "Morocco vs Colombia · VIP" },
-  { name: "Olivia T.", country: "Canada", match: "Canada vs Senegal · Regular" },
-  { name: "Marco R.", country: "Spain", match: "Spain vs Netherlands · VIP" },
+const fallbackPurchases: Purchase[] = [
+  { ticket_id: "f1", created_at: "", category: "vip", display_name: "Carlos M.", country: "Argentina", home_team: "France", away_team: "Argentina", home_flag: "🇫🇷", away_flag: "🇦🇷" },
+  { ticket_id: "f2", created_at: "", category: "regular", display_name: "Hannah K.", country: "Germany", home_team: "Brazil", away_team: "Germany", home_flag: "🇧🇷", away_flag: "🇩🇪" },
+  { ticket_id: "f3", created_at: "", category: "vip", display_name: "Liam O.", country: "USA", home_team: "USA", away_team: "England", home_flag: "🇺🇸", away_flag: "🏴󠁧󠁢󠁥󠁮󠁧󠁿" },
+  { ticket_id: "f4", created_at: "", category: "economy", display_name: "Kenji S.", country: "Japan", home_team: "Mexico", away_team: "Japan", home_flag: "🇲🇽", away_flag: "🇯🇵" },
 ];
 
 export function Testimonials() {
