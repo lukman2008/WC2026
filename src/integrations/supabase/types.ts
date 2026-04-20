@@ -380,6 +380,20 @@ export type Database = {
           transaction_id: string
         }[]
       }
+      get_recent_purchases: {
+        Args: { _limit?: number }
+        Returns: {
+          away_flag: string
+          away_team: string
+          category: Database["public"]["Enums"]["ticket_category"]
+          country: string
+          created_at: string
+          display_name: string
+          home_flag: string
+          home_team: string
+          ticket_id: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

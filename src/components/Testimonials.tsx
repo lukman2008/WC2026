@@ -2,6 +2,19 @@ import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Quote, Sparkles, Ticket } from "lucide-react";
 import { Flag } from "./Flag";
+import { supabase } from "@/integrations/supabase/client";
+
+interface Purchase {
+  ticket_id: string;
+  created_at: string;
+  category: "vip" | "regular" | "economy";
+  display_name: string;
+  country: string | null;
+  home_team: string;
+  away_team: string;
+  home_flag: string;
+  away_flag: string;
+}
 
 interface Testimonial {
   name: string;
@@ -21,15 +34,11 @@ const testimonials: Testimonial[] = [
   { name: "Aïsha Diallo", country: "Senegal", quote: "Smooth ETH payment for Canada vs Senegal. My family back home is so excited.", rating: 5 },
 ];
 
-const recentPurchases: { name: string; country: string; match: string }[] = [
-  { name: "Carlos M.", country: "Argentina", match: "France vs Argentina · VIP" },
-  { name: "Hannah K.", country: "Germany", match: "Brazil vs Germany · Regular" },
-  { name: "Liam O.", country: "USA", match: "USA vs England · VIP" },
-  { name: "Ines G.", country: "Portugal", match: "Portugal vs Italy · Regular" },
-  { name: "Kenji S.", country: "Japan", match: "Mexico vs Japan · Economy" },
-  { name: "Ahmed B.", country: "Morocco", match: "Morocco vs Colombia · VIP" },
-  { name: "Olivia T.", country: "Canada", match: "Canada vs Senegal · Regular" },
-  { name: "Marco R.", country: "Spain", match: "Spain vs Netherlands · VIP" },
+const fallbackPurchases: Purchase[] = [
+  { ticket_id: "f1", created_at: "", category: "vip", display_name: "Carlos M.", country: "Argentina", home_team: "France", away_team: "Argentina", home_flag: "🇫🇷", away_flag: "🇦🇷" },
+  { ticket_id: "f2", created_at: "", category: "regular", display_name: "Hannah K.", country: "Germany", home_team: "Brazil", away_team: "Germany", home_flag: "🇧🇷", away_flag: "🇩🇪" },
+  { ticket_id: "f3", created_at: "", category: "vip", display_name: "Liam O.", country: "USA", home_team: "USA", away_team: "England", home_flag: "🇺🇸", away_flag: "🏴󠁧󠁢󠁥󠁮󠁧󠁿" },
+  { ticket_id: "f4", created_at: "", category: "economy", display_name: "Kenji S.", country: "Japan", home_team: "Mexico", away_team: "Japan", home_flag: "🇲🇽", away_flag: "🇯🇵" },
 ];
 
 export function Testimonials() {
@@ -94,16 +103,49 @@ function Marquee({ items, duration, reverse = false }: { items: Testimonial[]; d
 }
 
 function LivePurchaseTicker() {
+  const [purchases, setPurchases] = useState<Purchase[]>(fallbackPurchases);
   const [idx, setIdx] = useState(0);
 
   useEffect(() => {
-    const id = setInterval(() => {
-      setIdx(i => (i + 1) % recentPurchases.length);
-    }, 3500);
-    return () => clearInterval(id);
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase.rpc("get_recent_purchases", { _limit: 20 });
+      if (!cancelled && data && data.length > 0) {
+        setPurchases(data as Purchase[]);
+        setIdx(0);
+      }
+    })();
+
+    const channel = supabase
+      .channel("recent-purchases")
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "tickets" }, async () => {
+        const { data } = await supabase.rpc("get_recent_purchases", { _limit: 20 });
+        if (!cancelled && data && data.length > 0) {
+          setPurchases(data as Purchase[]);
+          setIdx(0);
+        }
+      })
+      .subscribe();
+
+    return () => {
+      cancelled = true;
+      supabase.removeChannel(channel);
+    };
   }, []);
 
-  const current = recentPurchases[idx];
+  useEffect(() => {
+    if (purchases.length <= 1) return;
+    const id = setInterval(() => {
+      setIdx(i => (i + 1) % purchases.length);
+    }, 3500);
+    return () => clearInterval(id);
+  }, [purchases.length]);
+
+  const current = purchases[idx];
+  if (!current) return null;
+  const categoryLabel = current.category.charAt(0).toUpperCase() + current.category.slice(1);
+  const matchLabel = `${current.home_team} vs ${current.away_team} · ${categoryLabel}`;
+  const flagCountry = current.country || current.home_team;
 
   return (
     <div className="mb-10 flex justify-center">
@@ -122,11 +164,11 @@ function LivePurchaseTicker() {
             transition={{ duration: 0.25 }}
             className="flex items-center gap-2 text-xs sm:text-sm text-foreground min-w-0"
           >
-            <Flag team={current.country} size={16} />
-            <span className="font-semibold truncate">{current.name}</span>
+            <Flag team={flagCountry} size={16} />
+            <span className="font-semibold truncate">{current.display_name}</span>
             <span className="text-muted-foreground hidden sm:inline">just purchased</span>
             <span className="text-muted-foreground sm:hidden">·</span>
-            <span className="font-medium text-primary truncate">{current.match}</span>
+            <span className="font-medium text-primary truncate">{matchLabel}</span>
           </motion.div>
         </AnimatePresence>
       </div>
