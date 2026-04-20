@@ -164,11 +164,11 @@ function LivePurchaseTicker() {
             transition={{ duration: 0.25 }}
             className="flex items-center gap-2 text-xs sm:text-sm text-foreground min-w-0"
           >
-            <Flag team={current.country} size={16} />
-            <span className="font-semibold truncate">{current.name}</span>
+            <Flag team={flagCountry} size={16} />
+            <span className="font-semibold truncate">{current.display_name}</span>
             <span className="text-muted-foreground hidden sm:inline">just purchased</span>
             <span className="text-muted-foreground sm:hidden">·</span>
-            <span className="font-medium text-primary truncate">{current.match}</span>
+            <span className="font-medium text-primary truncate">{matchLabel}</span>
           </motion.div>
         </AnimatePresence>
       </div>
