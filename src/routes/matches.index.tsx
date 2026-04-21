@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { ChevronDown, ChevronLeft, ChevronRight, Settings, Apple, Smartphone, Loader2, Globe2, Ticket } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, Settings, Apple, Smartphone, Loader2, Globe2, Ticket, MapPin } from "lucide-react";
 import { Flag } from "@/components/Flag";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -22,6 +22,8 @@ interface DbMatch {
   away_team: string;
   match_date: string;
   price_economy: number;
+  stadium: string;
+  city: string;
 }
 
 interface ScheduleMatch {
@@ -32,6 +34,8 @@ interface ScheduleMatch {
   dateLabel: string;
   ts: number;
   fromPrice: number;
+  stadium: string;
+  city: string;
 }
 interface DayGroup { date: string; matches: ScheduleMatch[]; }
 interface Round { label: string; days: DayGroup[]; }
@@ -42,19 +46,36 @@ const ROUND_RANGES = [
   { label: "Round 3", startISO: "2026-06-24T12:00:00Z", endISO: "2026-06-29T00:00:00Z" },
 ];
 
-const userTZ = typeof Intl !== "undefined" ? Intl.DateTimeFormat().resolvedOptions().timeZone : "UTC";
+const detectedTZ = typeof Intl !== "undefined" ? Intl.DateTimeFormat().resolvedOptions().timeZone : "UTC";
 
-function formatDateLabel(d: Date) {
-  return d.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", timeZone: userTZ });
+const TZ_OPTIONS: { label: string; value: string }[] = [
+  { label: "Auto (your device)", value: "__auto__" },
+  { label: "Lagos (WAT)", value: "Africa/Lagos" },
+  { label: "London (GMT/BST)", value: "Europe/London" },
+  { label: "Paris (CET)", value: "Europe/Paris" },
+  { label: "New York (EST)", value: "America/New_York" },
+  { label: "Chicago (CST)", value: "America/Chicago" },
+  { label: "Denver (MST)", value: "America/Denver" },
+  { label: "Los Angeles (PST)", value: "America/Los_Angeles" },
+  { label: "São Paulo (BRT)", value: "America/Sao_Paulo" },
+  { label: "Dubai (GST)", value: "Asia/Dubai" },
+  { label: "Mumbai (IST)", value: "Asia/Kolkata" },
+  { label: "Tokyo (JST)", value: "Asia/Tokyo" },
+  { label: "Sydney (AEDT)", value: "Australia/Sydney" },
+  { label: "UTC", value: "UTC" },
+];
+
+function formatDateLabel(d: Date, tz: string) {
+  return d.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", timeZone: tz });
 }
-function formatTime(d: Date) {
-  return d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit", timeZone: userTZ });
+function formatTime(d: Date, tz: string) {
+  return d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit", timeZone: tz });
 }
-function tzAbbrev() {
+function tzAbbrev(tz: string) {
   try {
-    const parts = new Intl.DateTimeFormat(undefined, { timeZone: userTZ, timeZoneName: "short" }).formatToParts(new Date());
-    return parts.find(p => p.type === "timeZoneName")?.value ?? userTZ;
-  } catch { return userTZ; }
+    const parts = new Intl.DateTimeFormat(undefined, { timeZone: tz, timeZoneName: "short" }).formatToParts(new Date());
+    return parts.find(p => p.type === "timeZoneName")?.value ?? tz;
+  } catch { return tz; }
 }
 
 function CircleFlag({ team, size = 36 }: { team: string; size?: number }) {
@@ -92,7 +113,11 @@ function MatchCardBox({ match }: { match: ScheduleMatch }) {
           <span className="truncate w-full text-sm sm:text-base font-semibold text-foreground">{match.away}</span>
         </div>
       </div>
-      <div className="mt-4 pt-3 border-t border-border/60 flex items-center justify-between text-xs">
+      <div className="mt-3 flex items-start gap-1.5 text-[11px] text-muted-foreground">
+        <MapPin className="h-3 w-3 mt-0.5 shrink-0" />
+        <span className="leading-snug"><span className="font-medium text-foreground">{match.stadium}</span> · {match.city}</span>
+      </div>
+      <div className="mt-3 pt-3 border-t border-border/60 flex items-center justify-between text-xs">
         <span className="inline-flex items-center gap-1 text-muted-foreground">
           <Ticket className="h-3.5 w-3.5" /> from ${Math.round(match.fromPrice)}
         </span>
@@ -107,14 +132,16 @@ function MatchCardBox({ match }: { match: ScheduleMatch }) {
 function TvSchedulesPage() {
   const [roundIdx, setRoundIdx] = useState(0);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [tzChoice, setTzChoice] = useState<string>("__auto__");
   const [dbMatches, setDbMatches] = useState<DbMatch[] | null>(null);
+  const activeTZ = tzChoice === "__auto__" ? detectedTZ : tzChoice;
 
   useEffect(() => {
     let active = true;
     (async () => {
       const { data } = await supabase
         .from("matches")
-        .select("id,home_team,away_team,match_date,price_economy")
+        .select("id,home_team,away_team,match_date,price_economy,stadium,city")
         .gte("match_date", "2026-06-11")
         .lt("match_date", "2026-06-29")
         .order("match_date", { ascending: true });
@@ -135,15 +162,17 @@ function TvSchedulesPage() {
       const byDay = new Map<string, ScheduleMatch[]>();
       for (const m of inRound) {
         const d = new Date(m.match_date);
-        const dateLabel = formatDateLabel(d);
+        const dateLabel = formatDateLabel(d, activeTZ);
         const sm: ScheduleMatch = {
           id: m.id,
           home: m.home_team,
           away: m.away_team,
-          time: formatTime(d),
+          time: formatTime(d, activeTZ),
           dateLabel,
           ts: d.getTime(),
           fromPrice: Number(m.price_economy),
+          stadium: m.stadium,
+          city: m.city,
         };
         if (!byDay.has(dateLabel)) byDay.set(dateLabel, []);
         byDay.get(dateLabel)!.push(sm);
@@ -153,10 +182,10 @@ function TvSchedulesPage() {
         .sort((a, b) => a.matches[0].ts - b.matches[0].ts);
       return { label: r.label, days };
     });
-  }, [dbMatches]);
+  }, [dbMatches, activeTZ]);
 
   const round = rounds[roundIdx];
-  const tz = tzAbbrev();
+  const tz = tzAbbrev(activeTZ);
 
   return (
     <div className="min-h-screen bg-muted/30">
@@ -179,9 +208,20 @@ function TvSchedulesPage() {
       <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
         {/* Header w/ timezone */}
         <div className="mb-6 flex flex-col items-center gap-3 text-center">
-          <div className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1 text-xs text-muted-foreground shadow-sm">
+          <div className="inline-flex flex-wrap items-center justify-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground shadow-sm">
             <Globe2 className="h-3.5 w-3.5" />
-            Times shown in your local timezone · <span className="font-semibold text-foreground">{tz}</span>
+            <span>Times in</span>
+            <select
+              value={tzChoice}
+              onChange={(e) => setTzChoice(e.target.value)}
+              className="bg-transparent font-semibold text-foreground outline-none cursor-pointer hover:text-primary transition-colors"
+              aria-label="Select timezone"
+            >
+              {TZ_OPTIONS.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+            <span className="px-1.5 py-0.5 rounded bg-secondary font-semibold text-foreground">{tz}</span>
           </div>
           <div className="flex items-center gap-2">
             <button onClick={() => setRoundIdx(Math.max(0, roundIdx - 1))} disabled={roundIdx === 0} aria-label="Previous round" className="flex h-10 w-10 items-center justify-center rounded-full border border-border bg-card text-foreground shadow-sm transition hover:bg-secondary disabled:opacity-40 disabled:cursor-not-allowed">
