@@ -113,7 +113,11 @@ function MatchCardBox({ match }: { match: ScheduleMatch }) {
           <span className="truncate w-full text-sm sm:text-base font-semibold text-foreground">{match.away}</span>
         </div>
       </div>
-      <div className="mt-4 pt-3 border-t border-border/60 flex items-center justify-between text-xs">
+      <div className="mt-3 flex items-start gap-1.5 text-[11px] text-muted-foreground">
+        <MapPin className="h-3 w-3 mt-0.5 shrink-0" />
+        <span className="leading-snug"><span className="font-medium text-foreground">{match.stadium}</span> · {match.city}</span>
+      </div>
+      <div className="mt-3 pt-3 border-t border-border/60 flex items-center justify-between text-xs">
         <span className="inline-flex items-center gap-1 text-muted-foreground">
           <Ticket className="h-3.5 w-3.5" /> from ${Math.round(match.fromPrice)}
         </span>
@@ -128,7 +132,9 @@ function MatchCardBox({ match }: { match: ScheduleMatch }) {
 function TvSchedulesPage() {
   const [roundIdx, setRoundIdx] = useState(0);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [tzChoice, setTzChoice] = useState<string>("__auto__");
   const [dbMatches, setDbMatches] = useState<DbMatch[] | null>(null);
+  const activeTZ = tzChoice === "__auto__" ? detectedTZ : tzChoice;
 
   useEffect(() => {
     let active = true;
@@ -156,12 +162,12 @@ function TvSchedulesPage() {
       const byDay = new Map<string, ScheduleMatch[]>();
       for (const m of inRound) {
         const d = new Date(m.match_date);
-        const dateLabel = formatDateLabel(d);
+        const dateLabel = formatDateLabel(d, activeTZ);
         const sm: ScheduleMatch = {
           id: m.id,
           home: m.home_team,
           away: m.away_team,
-          time: formatTime(d),
+          time: formatTime(d, activeTZ),
           dateLabel,
           ts: d.getTime(),
           fromPrice: Number(m.price_economy),
@@ -176,10 +182,10 @@ function TvSchedulesPage() {
         .sort((a, b) => a.matches[0].ts - b.matches[0].ts);
       return { label: r.label, days };
     });
-  }, [dbMatches]);
+  }, [dbMatches, activeTZ]);
 
   const round = rounds[roundIdx];
-  const tz = tzAbbrev();
+  const tz = tzAbbrev(activeTZ);
 
   return (
     <div className="min-h-screen bg-muted/30">
@@ -202,9 +208,20 @@ function TvSchedulesPage() {
       <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
         {/* Header w/ timezone */}
         <div className="mb-6 flex flex-col items-center gap-3 text-center">
-          <div className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1 text-xs text-muted-foreground shadow-sm">
+          <div className="inline-flex flex-wrap items-center justify-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground shadow-sm">
             <Globe2 className="h-3.5 w-3.5" />
-            Times shown in your local timezone · <span className="font-semibold text-foreground">{tz}</span>
+            <span>Times in</span>
+            <select
+              value={tzChoice}
+              onChange={(e) => setTzChoice(e.target.value)}
+              className="bg-transparent font-semibold text-foreground outline-none cursor-pointer hover:text-primary transition-colors"
+              aria-label="Select timezone"
+            >
+              {TZ_OPTIONS.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+            <span className="px-1.5 py-0.5 rounded bg-secondary font-semibold text-foreground">{tz}</span>
           </div>
           <div className="flex items-center gap-2">
             <button onClick={() => setRoundIdx(Math.max(0, roundIdx - 1))} disabled={roundIdx === 0} aria-label="Previous round" className="flex h-10 w-10 items-center justify-center rounded-full border border-border bg-card text-foreground shadow-sm transition hover:bg-secondary disabled:opacity-40 disabled:cursor-not-allowed">
