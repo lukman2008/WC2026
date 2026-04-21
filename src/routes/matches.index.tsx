@@ -22,6 +22,8 @@ interface DbMatch {
   away_team: string;
   match_date: string;
   price_economy: number;
+  stadium: string;
+  city: string;
 }
 
 interface ScheduleMatch {
@@ -32,6 +34,8 @@ interface ScheduleMatch {
   dateLabel: string;
   ts: number;
   fromPrice: number;
+  stadium: string;
+  city: string;
 }
 interface DayGroup { date: string; matches: ScheduleMatch[]; }
 interface Round { label: string; days: DayGroup[]; }
