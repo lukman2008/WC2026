@@ -46,19 +46,36 @@ const ROUND_RANGES = [
   { label: "Round 3", startISO: "2026-06-24T12:00:00Z", endISO: "2026-06-29T00:00:00Z" },
 ];
 
-const userTZ = typeof Intl !== "undefined" ? Intl.DateTimeFormat().resolvedOptions().timeZone : "UTC";
+const detectedTZ = typeof Intl !== "undefined" ? Intl.DateTimeFormat().resolvedOptions().timeZone : "UTC";
 
-function formatDateLabel(d: Date) {
-  return d.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", timeZone: userTZ });
+const TZ_OPTIONS: { label: string; value: string }[] = [
+  { label: "Auto (your device)", value: "__auto__" },
+  { label: "Lagos (WAT)", value: "Africa/Lagos" },
+  { label: "London (GMT/BST)", value: "Europe/London" },
+  { label: "Paris (CET)", value: "Europe/Paris" },
+  { label: "New York (EST)", value: "America/New_York" },
+  { label: "Chicago (CST)", value: "America/Chicago" },
+  { label: "Denver (MST)", value: "America/Denver" },
+  { label: "Los Angeles (PST)", value: "America/Los_Angeles" },
+  { label: "São Paulo (BRT)", value: "America/Sao_Paulo" },
+  { label: "Dubai (GST)", value: "Asia/Dubai" },
+  { label: "Mumbai (IST)", value: "Asia/Kolkata" },
+  { label: "Tokyo (JST)", value: "Asia/Tokyo" },
+  { label: "Sydney (AEDT)", value: "Australia/Sydney" },
+  { label: "UTC", value: "UTC" },
+];
+
+function formatDateLabel(d: Date, tz: string) {
+  return d.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", timeZone: tz });
 }
-function formatTime(d: Date) {
-  return d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit", timeZone: userTZ });
+function formatTime(d: Date, tz: string) {
+  return d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit", timeZone: tz });
 }
-function tzAbbrev() {
+function tzAbbrev(tz: string) {
   try {
-    const parts = new Intl.DateTimeFormat(undefined, { timeZone: userTZ, timeZoneName: "short" }).formatToParts(new Date());
-    return parts.find(p => p.type === "timeZoneName")?.value ?? userTZ;
-  } catch { return userTZ; }
+    const parts = new Intl.DateTimeFormat(undefined, { timeZone: tz, timeZoneName: "short" }).formatToParts(new Date());
+    return parts.find(p => p.type === "timeZoneName")?.value ?? tz;
+  } catch { return tz; }
 }
 
 function CircleFlag({ team, size = 36 }: { team: string; size?: number }) {
