@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { ChevronDown, ChevronLeft, ChevronRight, Settings, Apple, Smartphone, Loader2, Globe2, Ticket } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, Settings, Apple, Smartphone, Loader2, Globe2, Ticket, MapPin } from "lucide-react";
 import { Flag } from "@/components/Flag";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -118,7 +118,7 @@ function TvSchedulesPage() {
     (async () => {
       const { data } = await supabase
         .from("matches")
-        .select("id,home_team,away_team,match_date,price_economy")
+        .select("id,home_team,away_team,match_date,price_economy,stadium,city")
         .gte("match_date", "2026-06-11")
         .lt("match_date", "2026-06-29")
         .order("match_date", { ascending: true });
@@ -148,6 +148,8 @@ function TvSchedulesPage() {
           dateLabel,
           ts: d.getTime(),
           fromPrice: Number(m.price_economy),
+          stadium: m.stadium,
+          city: m.city,
         };
         if (!byDay.has(dateLabel)) byDay.set(dateLabel, []);
         byDay.get(dateLabel)!.push(sm);
