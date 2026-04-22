@@ -210,17 +210,7 @@ function TvSchedulesPage() {
         <div className="mb-6 flex flex-col items-center gap-3 text-center">
           <div className="inline-flex flex-wrap items-center justify-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground shadow-sm">
             <Globe2 className="h-3.5 w-3.5" />
-            <span>Times in</span>
-            <select
-              value={tzChoice}
-              onChange={(e) => setTzChoice(e.target.value)}
-              className="bg-transparent font-semibold text-foreground outline-none cursor-pointer hover:text-primary transition-colors"
-              aria-label="Select timezone"
-            >
-              {TZ_OPTIONS.map(opt => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
+            <span>Times in your local timezone</span>
             <span className="px-1.5 py-0.5 rounded bg-secondary font-semibold text-foreground">{tz}</span>
           </div>
           <div className="flex items-center gap-2">
