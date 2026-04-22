@@ -133,9 +133,8 @@ function MatchRow({ match }: { match: ScheduleMatch }) {
 function TvSchedulesPage() {
   const [roundIdx, setRoundIdx] = useState(0);
   const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [tzChoice, setTzChoice] = useState<string>("__auto__");
   const [dbMatches, setDbMatches] = useState<DbMatch[] | null>(null);
-  const activeTZ = tzChoice === "__auto__" ? detectedTZ : tzChoice;
+  const activeTZ = detectedTZ;
 
   useEffect(() => {
     let active = true;
