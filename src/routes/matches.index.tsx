@@ -48,8 +48,17 @@ const ROUND_RANGES = [
 
 const detectedTZ = typeof Intl !== "undefined" ? Intl.DateTimeFormat().resolvedOptions().timeZone : "UTC";
 
+function autoLabel(tz: string) {
+  try {
+    const city = tz.split("/").pop()?.replace(/_/g, " ") ?? tz;
+    const abbr = new Intl.DateTimeFormat(undefined, { timeZone: tz, timeZoneName: "short" })
+      .formatToParts(new Date()).find(p => p.type === "timeZoneName")?.value ?? "";
+    return `${city} (${abbr})`;
+  } catch { return tz; }
+}
+
 const TZ_OPTIONS: { label: string; value: string }[] = [
-  { label: "Auto (your device)", value: "__auto__" },
+  { label: `${autoLabel(detectedTZ)} — your region`, value: "__auto__" },
   { label: "Lagos (WAT)", value: "Africa/Lagos" },
   { label: "London (GMT/BST)", value: "Europe/London" },
   { label: "Paris (CET)", value: "Europe/Paris" },
