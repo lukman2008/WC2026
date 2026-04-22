@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { ChevronDown, ChevronLeft, ChevronRight, Settings, Apple, Smartphone, Loader2, Globe2, Ticket, MapPin } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, Settings, Apple, Smartphone, Loader2, Globe2, ChevronRight as ChevronRightIcon } from "lucide-react";
 import { Flag } from "@/components/Flag";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -78,10 +78,10 @@ function tzAbbrev(tz: string) {
   } catch { return tz; }
 }
 
-function CircleFlag({ team, size = 36 }: { team: string; size?: number }) {
+function CircleFlag({ team, size = 24 }: { team: string; size?: number }) {
   return (
     <span
-      className="relative inline-flex overflow-hidden rounded-full ring-2 ring-background shadow-sm bg-muted shrink-0"
+      className="relative inline-flex overflow-hidden rounded-full bg-muted shrink-0"
       style={{ height: size, width: size }}
     >
       <Flag team={team} size={size} rounded={false} className="!h-full !w-full scale-150 object-cover" />
@@ -89,42 +89,34 @@ function CircleFlag({ team, size = 36 }: { team: string; size?: number }) {
   );
 }
 
-function MatchCardBox({ match }: { match: ScheduleMatch }) {
+function MatchRow({ match }: { match: ScheduleMatch }) {
   return (
     <Link
       to="/matches/$matchId"
       params={{ matchId: match.id }}
-      className="group relative block rounded-2xl border border-border bg-card p-4 sm:p-5 shadow-sm transition-all hover:shadow-md hover:border-primary/40 hover:-translate-y-0.5"
+      className="group flex items-center gap-3 sm:gap-4 px-3 sm:px-4 py-3 transition-colors hover:bg-secondary/60 active:bg-secondary"
     >
-      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 sm:gap-5">
-        <div className="flex flex-col items-center text-center gap-2 min-w-0">
+      <div className="w-12 sm:w-14 shrink-0 text-xs sm:text-sm font-semibold tabular-nums text-foreground">
+        {match.time}
+      </div>
+      <div className="h-8 w-px bg-border shrink-0" />
+      <div className="flex-1 min-w-0 flex flex-col gap-1">
+        <div className="flex items-center gap-2 min-w-0">
           <CircleFlag team={match.home} />
-          <span className="truncate w-full text-sm sm:text-base font-semibold text-foreground">{match.home}</span>
+          <span className="truncate text-sm font-medium text-foreground">{match.home}</span>
         </div>
-        <div className="flex flex-col items-center gap-1.5">
-          <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Kickoff</span>
-          <div className="px-3 py-1.5 rounded-lg bg-gradient-primary text-primary-foreground text-xs sm:text-sm font-bold tabular-nums whitespace-nowrap shadow-sm">
-            {match.time}
-          </div>
-          <span className="text-[10px] font-medium text-muted-foreground">vs</span>
-        </div>
-        <div className="flex flex-col items-center text-center gap-2 min-w-0">
+        <div className="flex items-center gap-2 min-w-0">
           <CircleFlag team={match.away} />
-          <span className="truncate w-full text-sm sm:text-base font-semibold text-foreground">{match.away}</span>
+          <span className="truncate text-sm font-medium text-foreground">{match.away}</span>
+        </div>
+        <div className="text-[11px] text-muted-foreground truncate mt-0.5">
+          {match.stadium} · {match.city}
         </div>
       </div>
-      <div className="mt-3 flex items-start gap-1.5 text-[11px] text-muted-foreground">
-        <MapPin className="h-3 w-3 mt-0.5 shrink-0" />
-        <span className="leading-snug"><span className="font-medium text-foreground">{match.stadium}</span> · {match.city}</span>
+      <div className="hidden sm:block text-[11px] text-muted-foreground shrink-0">
+        from <span className="font-semibold text-foreground">${Math.round(match.fromPrice)}</span>
       </div>
-      <div className="mt-3 pt-3 border-t border-border/60 flex items-center justify-between text-xs">
-        <span className="inline-flex items-center gap-1 text-muted-foreground">
-          <Ticket className="h-3.5 w-3.5" /> from ${Math.round(match.fromPrice)}
-        </span>
-        <span className="font-semibold text-primary opacity-0 group-hover:opacity-100 transition-opacity">
-          Get tickets →
-        </span>
-      </div>
+      <ChevronRightIcon className="h-4 w-4 text-muted-foreground shrink-0 group-hover:text-foreground transition-colors" />
     </Link>
   );
 }
@@ -253,18 +245,16 @@ function TvSchedulesPage() {
         ) : !round || round.days.length === 0 ? (
           <div className="text-center py-16 text-muted-foreground text-sm">No matches scheduled for this round.</div>
         ) : (
-          <div className="space-y-8">
+          <div className="max-w-2xl mx-auto space-y-4">
             {round.days.map(day => (
-              <section key={day.date}>
-                <header className="mb-3 flex items-center gap-3">
-                  <div className="h-px flex-1 bg-border" />
-                  <h2 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-foreground px-3 py-1 rounded-full bg-card border border-border shadow-sm">
+              <section key={day.date} className="rounded-xl border border-border bg-card overflow-hidden shadow-sm">
+                <header className="px-4 py-2.5 bg-muted/50 border-b border-border">
+                  <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                     {day.date}
                   </h2>
-                  <div className="h-px flex-1 bg-border" />
                 </header>
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {day.matches.map(m => <MatchCardBox key={m.id} match={m} />)}
+                <div className="divide-y divide-border">
+                  {day.matches.map(m => <MatchRow key={m.id} match={m} />)}
                 </div>
               </section>
             ))}
