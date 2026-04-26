@@ -33,6 +33,7 @@ function HomePage() {
             city: m.city,
             date: d.toLocaleDateString(undefined, { year: "numeric", month: "2-digit", day: "2-digit", timeZone: userTZ }),
             time: d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", timeZone: userTZ }),
+            dateObj: d,
             group: m.group_name || "",
             stage: m.stage,
             ticketsAvailable: { vip: m.available_vip, regular: m.available_regular, economy: m.available_economy },
@@ -50,7 +51,7 @@ function HomePage() {
   // Group Stage = next 6 group stage matches matching the TV schedule list
   const upcomingMatches = matches.filter(m => m.stage === "Group Stage").slice(0, 6);
   const finalMatch = matches.find(m => m.stage === "Final");
-  const finalDate = finalMatch ? new Date(finalMatch.date) : new Date("2026-07-19T18:00");
+  const finalDate = finalMatch ? finalMatch.dateObj : new Date("2026-07-19T18:00:00Z");
 
   return (
     <div>

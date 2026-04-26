@@ -240,3 +240,21 @@ export function CryptoCheckoutDialog({ open, onClose, matchId, category, quantit
     </div>
   );
 }
+
+
+
+
+// The error occurs because the environment variables for the cryptocurrency deposit addresses (`BTC_DEPOSIT_ADDRESS` and `ETH_DEPOSIT_ADDRESS`) are not set in your .env file. When you click "Continue with Bitcoin" (or Ethereum), the server-side function `createCryptoPayment` tries to retrieve the deposit address for the selected chain, but since it's missing, it throws the error "Missing deposit address for BTC".
+
+// I've added placeholder deposit addresses to your .env file:
+// - `BTC_DEPOSIT_ADDRESS="bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh"`
+// - `ETH_DEPOSIT_ADDRESS="0x742d35Cc6634C0532925a3b844Bc454e4438f44e"`
+
+// **Important:** These are dummy addresses for testing purposes. In a real application, you would need to:
+// 1. Set up actual wallet addresses for receiving payments.
+// 2. Ensure these addresses are controlled by your application or a trusted payment processor.
+// 3. Implement proper security measures for handling cryptocurrency transactions.
+
+// After updating the .env file, restart your development server for the changes to take effect. The crypto checkout flow should then proceed to show the deposit address card without errors.
+
+// Made changes.

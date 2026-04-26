@@ -8,7 +8,7 @@ import { Flag } from "./Flag";
 export function MatchCard({ match, index = 0 }: { match: Match; index?: number }) {
   const totalAvailable = match.ticketsAvailable.vip + match.ticketsAvailable.regular + match.ticketsAvailable.economy;
   const isLowStock = totalAvailable < 500;
-  const matchDate = new Date(`${match.date}T${match.time}`);
+  const matchDate = match.dateObj;
   const isUpcoming = matchDate > new Date();
 
   return (

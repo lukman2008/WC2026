@@ -19,7 +19,13 @@ function createSupabaseClient() {
       storage: typeof window !== 'undefined' ? localStorage : undefined,
       persistSession: true,
       autoRefreshToken: true,
-    }
+      detectSessionInUrl: false, // Disable to prevent race conditions in multi-tab scenarios
+    },
+    global: {
+      headers: {
+        'x-client-info': 'goal-getter-ticket',
+      },
+    },
   });
 }
 
