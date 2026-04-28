@@ -1,9 +1,13 @@
-import { Outlet, Link, createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";
-import appCss from "../styles.css?url";
+import { Outlet, Link, createRootRoute } from "@tanstack/react-router";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { Toaster } from "@/components/ui/sonner";
+
+export const Route = createRootRoute({
+  component: RootComponent,
+  notFoundComponent: NotFoundComponent,
+});
 
 function NotFoundComponent() {
   return (
@@ -27,45 +31,6 @@ function NotFoundComponent() {
   );
 }
 
-export const Route = createRootRoute({
-  head: () => ({
-    meta: [
-      { charSet: "utf-8" },
-      { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "FIFA World Cup 2026 Tickets | Official Ticketing Platform" },
-      { name: "description", content: "Buy tickets for the FIFA World Cup 2026 in USA, Mexico & Canada. Browse matches, select seats, and secure your spot at the biggest sporting event." },
-      { property: "og:title", content: "FIFA World Cup 2026 Tickets | Official Ticketing Platform" },
-      { property: "og:description", content: "Buy tickets for the FIFA World Cup 2026 in USA, Mexico & Canada. Browse matches, select seats, and secure your spot at the biggest sporting event." },
-      { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:title", content: "FIFA World Cup 2026 Tickets | Official Ticketing Platform" },
-      { name: "twitter:description", content: "Buy tickets for the FIFA World Cup 2026 in USA, Mexico & Canada. Browse matches, select seats, and secure your spot at the biggest sporting event." },
-      { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/79d60d3a-e013-40b2-b116-bc9879885edc" },
-      { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/79d60d3a-e013-40b2-b116-bc9879885edc" },
-    ],
-    links: [{ rel: "stylesheet", href: appCss }],
-  }),
-  shellComponent: RootShell,
-  component: RootComponent,
-  notFoundComponent: NotFoundComponent,
-});
-
-const themeInitScript = `(function(){try{var t=localStorage.getItem('theme');var c=t==='light'?'light':'dark';var r=document.documentElement;r.classList.remove('light','dark');r.classList.add(c);}catch(e){}})();`;
-
-function RootShell({ children }: { children: React.ReactNode }) {
-  return (
-    <html lang="en" className="dark">
-      <head>
-        <HeadContent />
-        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
-      </head>
-      <body>
-        {children}
-        <Scripts />
-      </body>
-    </html>
-  );
-}
 
 function RootComponent() {
   return (
