@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { Loader2, Copy, Check, Bitcoin, AlertCircle } from "lucide-react";
-import { useServerFn } from "@tanstack/react-start";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { createCryptoPayment, verifyCryptoPayment } from "@/utils/crypto.functions";
@@ -35,8 +34,6 @@ const chainMeta: Record<Chain, { label: string; symbol: string; color: string }>
 
 export function CryptoCheckoutDialog({ open, onClose, matchId, category, quantity, usdTotal }: Props) {
   const navigate = useNavigate();
-  const create = useServerFn(createCryptoPayment);
-  const verify = useServerFn(verifyCryptoPayment);
 
   const [chain, setChain] = useState<Chain>("btc");
   const [creating, setCreating] = useState(false);
@@ -66,7 +63,7 @@ export function CryptoCheckoutDialog({ open, onClose, matchId, category, quantit
   const handleCreate = async () => {
     setCreating(true);
     try {
-      const res = await create({ data: { matchId, category, quantity, chain } });
+      const res = await createCryptoPayment({ matchId, category, quantity, chain });
       if (!res.ok) { toast.error(res.error); return; }
       setPayment({
         paymentId: res.paymentId,
@@ -92,7 +89,7 @@ export function CryptoCheckoutDialog({ open, onClose, matchId, category, quantit
     setVerifying(true);
     setPendingMsg(null);
     try {
-      const res = await verify({ data: { paymentId: payment.paymentId, txHash: trimmed } });
+      const res = await verifyCryptoPayment({ paymentId: payment.paymentId, txHash: trimmed });
       if (!res.ok) { toast.error(res.error); return; }
       if (res.status === "completed") {
         toast.success("Payment confirmed! Tickets issued.", {
