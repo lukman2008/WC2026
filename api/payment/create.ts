@@ -13,20 +13,31 @@ const MIN_CONFIRMATIONS = { btc: 1, eth: 6 } as const;
 
 async function getUsdRate(chain: "btc" | "eth"): Promise<number> {
   const id = chain === "btc" ? "bitcoin" : "ethereum";
-  const res = await fetch(
-    `https://api.coingecko.com/api/v3/simple/price?ids=${id}&vs_currencies=usd`,
-    { headers: { accept: "application/json" } }
-  );
-  if (!res.ok) throw new Error(`CoinGecko price fetch failed (${res.status})`);
-  const json = (await res.json()) as Record<string, { usd: number }>;
-  const rate = json[id]?.usd;
-  if (!rate || rate <= 0) throw new Error("Invalid price from CoinGecko");
-  return rate;
+  try {
+    const res = await fetch(
+      `https://api.coingecko.com/api/v3/simple/price?ids=${id}&vs_currencies=usd`,
+      { headers: { accept: "application/json" } }
+    );
+    if (!res.ok) throw new Error(`CoinGecko price fetch failed (${res.status})`);
+    const json = (await res.json()) as Record<string, { usd: number }>;
+    const rate = json[id]?.usd;
+    if (!rate || rate <= 0) throw new Error("Invalid price from CoinGecko");
+    return rate;
+  } catch (err: any) {
+    console.error(`Error fetching USD rate for ${chain}:`, err);
+    throw new Error(`Failed to get conversion rate: ${err.message}`);
+  }
 }
 
 function getDepositAddress(chain: "btc" | "eth"): string {
-  const addr = chain === "btc" ? process.env.BTC_DEPOSIT_ADDRESS : process.env.ETH_DEPOSIT_ADDRESS;
-  if (!addr) throw new Error(`Missing deposit address for ${chain.toUpperCase()}`);
+  const addr = chain === "btc" 
+    ? (process.env.BTC_DEPOSIT_ADDRESS || process.env.VITE_BTC_DEPOSIT_ADDRESS)
+    : (process.env.ETH_DEPOSIT_ADDRESS || process.env.VITE_ETH_DEPOSIT_ADDRESS);
+  
+  if (!addr) {
+    console.error(`Missing deposit address for ${chain.toUpperCase()}. Please set BTC_DEPOSIT_ADDRESS or ETH_DEPOSIT_ADDRESS in environment variables.`);
+    throw new Error(`Server configuration error: Missing ${chain.toUpperCase()} deposit address`);
+  }
   return addr;
 }
 
@@ -40,15 +51,21 @@ export default async function handler(req: any, res: any) {
     }
     const token = authHeader.split(" ")[1];
 
-    const supabase = createClient(
-      process.env.SUPABASE_URL!,
-      process.env.SUPABASE_PUBLISHABLE_KEY!
-    );
+    const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_PUBLISHABLE_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+    if (!supabaseUrl || !supabaseKey) {
+      console.error("Missing Supabase environment variables");
+      return res.status(500).json({ error: "Server configuration error: Missing database credentials" });
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseKey);
 
     const { data: { user }, error: authErr } = await supabase.auth.getUser(token);
     if (authErr || !user) return res.status(401).json({ error: "Invalid token" });
 
     const body = createInput.parse(req.body);
+    console.log("Parsed request body:", body);
 
     const { data: match, error: matchErr } = await supabase
       .from("matches")
@@ -56,7 +73,16 @@ export default async function handler(req: any, res: any) {
       .eq("id", body.matchId)
       .maybeSingle();
     
-    if (matchErr || !match) return res.status(404).json({ error: "Match not found" });
+    if (matchErr) {
+      console.error("Database error fetching match:", matchErr);
+      return res.status(500).json({ error: "Database error fetching match details" });
+    }
+    if (!match) {
+      console.warn("Match not found:", body.matchId);
+      return res.status(404).json({ error: "Match not found" });
+    }
+
+    console.log("Found match details:", match);
 
     const priceMap = { vip: Number(match.price_vip), regular: Number(match.price_regular), economy: Number(match.price_economy) };
     const availMap = { vip: match.available_vip, regular: match.available_regular, economy: match.available_economy };
@@ -66,10 +92,16 @@ export default async function handler(req: any, res: any) {
     }
 
     const usd = +(priceMap[body.category] * body.quantity).toFixed(2);
+    console.log(`Calculating payment for ${body.quantity} ${body.category} tickets. USD Total: ${usd}`);
+
     const rate = await getUsdRate(body.chain);
+    console.log(`Current ${body.chain.toUpperCase()} rate: ${rate}`);
+
     const cryptoAmount = +(usd / rate).toFixed(8);
     const depositAddress = getDepositAddress(body.chain);
     const expiresAt = new Date(Date.now() + PAYMENT_TTL_MS).toISOString();
+
+    console.log("Attempting to insert crypto_payment record...");
 
     const { data: row, error: insErr } = await supabase
       .from("crypto_payments")
@@ -88,7 +120,12 @@ export default async function handler(req: any, res: any) {
       .select("id")
       .single();
 
-    if (insErr || !row) return res.status(500).json({ error: insErr?.message || "Could not create payment" });
+    if (insErr || !row) {
+      console.error("Database error inserting crypto_payment:", insErr);
+      return res.status(500).json({ error: insErr?.message || "Could not create payment record in database" });
+    }
+
+    console.log("Successfully created crypto_payment record:", row.id);
 
     return res.status(200).json({
       ok: true,
@@ -101,8 +138,8 @@ export default async function handler(req: any, res: any) {
       expiresAt,
       minConfirmations: MIN_CONFIRMATIONS[body.chain],
     });
-  } catch (e: any) {
-    console.error("API create payment error:", e);
-    return res.status(500).json({ error: e.message || "Internal server error" });
+  } catch (err: any) {
+    console.error("Error in /api/payment/create:", err);
+    return res.status(500).json({ error: err.message || "Internal server error" });
   }
 }

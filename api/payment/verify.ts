@@ -39,8 +39,11 @@ async function verifyBtcTx(txHash: string, expectedAddress: string) {
 }
 
 async function verifyEthTx(txHash: string, expectedAddress: string) {
-  const apiKey = process.env.ALCHEMY_API_KEY;
-  if (!apiKey) throw new Error("ALCHEMY_API_KEY not configured");
+  const apiKey = process.env.ALCHEMY_API_KEY || process.env.VITE_ALCHEMY_API_KEY;
+  if (!apiKey) {
+    console.error("ALCHEMY_API_KEY is missing from environment variables.");
+    throw new Error("Server configuration error: Missing Alchemy API Key for Ethereum verification");
+  }
   const url = `https://eth-mainnet.g.alchemy.com/v2/${apiKey}`;
 
   const rpc = async (method: string, params: unknown[]) => {
@@ -87,10 +90,15 @@ export default async function handler(req: any, res: any) {
     }
     const token = authHeader.split(" ")[1];
 
-    const supabase = createClient(
-      process.env.SUPABASE_URL!,
-      process.env.SUPABASE_PUBLISHABLE_KEY!
-    );
+    const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_PUBLISHABLE_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+    if (!supabaseUrl || !supabaseKey) {
+      console.error("Missing Supabase environment variables");
+      return res.status(500).json({ error: "Server configuration error: Missing database credentials" });
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseKey);
 
     const { data: { user }, error: authErr } = await supabase.auth.getUser(token);
     if (authErr || !user) return res.status(401).json({ error: "Invalid token" });

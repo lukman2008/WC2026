@@ -31,21 +31,33 @@ async function getAuthHeaders() {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
-export const createCryptoPayment = async (input: z.infer<typeof createInput>): Promise<CreateResult> => {
+export const createCryptoPayment = async (
+  input: z.infer<typeof createInput>,
+  token?: string
+): Promise<CreateResult> => {
   try {
-    const headers = await getAuthHeaders();
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    } else {
+      const authHeaders = await getAuthHeaders();
+      Object.assign(headers, authHeaders);
+    }
+
     const response = await fetch("/api/payment/create", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...headers,
-      },
+      headers,
       body: JSON.stringify(createInput.parse(input)),
     });
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      return { ok: false, error: errorData.error || `Request failed with status ${response.status}` };
+      let errorData;
+      try {
+        errorData = await response.json();
+      } catch (e) {
+        errorData = { error: `Server error: ${response.statusText}` };
+      }
+      return { ok: false, error: errorData.message || errorData.error || "Failed to create payment" };
     }
 
     return await response.json();
@@ -55,21 +67,33 @@ export const createCryptoPayment = async (input: z.infer<typeof createInput>): P
   }
 };
 
-export const verifyCryptoPayment = async (input: z.infer<typeof verifyInput>): Promise<VerifyApiResult> => {
+export const verifyCryptoPayment = async (
+  input: z.infer<typeof verifyInput>,
+  token?: string
+): Promise<VerifyApiResult> => {
   try {
-    const headers = await getAuthHeaders();
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    } else {
+      const authHeaders = await getAuthHeaders();
+      Object.assign(headers, authHeaders);
+    }
+
     const response = await fetch("/api/payment/verify", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...headers,
-      },
+      headers,
       body: JSON.stringify(verifyInput.parse(input)),
     });
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      return { ok: false, error: errorData.error || `Request failed with status ${response.status}` };
+      let errorData;
+      try {
+        errorData = await response.json();
+      } catch (e) {
+        errorData = { error: `Server error: ${response.statusText}` };
+      }
+      return { ok: false, error: errorData.message || errorData.error || "Failed to verify payment" };
     }
 
     return await response.json();
