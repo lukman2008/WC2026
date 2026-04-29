@@ -1,3 +1,4 @@
+import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
@@ -80,7 +81,7 @@ async function verifyEthTx(txHash: string, expectedAddress: string) {
   return { ok: toMatched, confirmations, amountReceived: amountEth, toMatched };
 }
 
-export default async function handler(req: any, res: any) {
+export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Add CORS headers
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');

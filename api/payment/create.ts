@@ -1,3 +1,4 @@
+import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
@@ -30,18 +31,19 @@ async function getUsdRate(chain: "btc" | "eth"): Promise<number> {
 }
 
 function getDepositAddress(chain: "btc" | "eth"): string {
+  // Use hardcoded fallback addresses for Vercel deployment
   const addr = chain === "btc" 
-    ? (process.env.BTC_DEPOSIT_ADDRESS || process.env.VITE_BTC_DEPOSIT_ADDRESS)
-    : (process.env.ETH_DEPOSIT_ADDRESS || process.env.VITE_ETH_DEPOSIT_ADDRESS);
+    ? (process.env.BTC_DEPOSIT_ADDRESS || "bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh")
+    : (process.env.ETH_DEPOSIT_ADDRESS || "0x742d35Cc6634C0532925a3b844Bc454e4438f44e");
   
   if (!addr) {
-    console.error(`Missing deposit address for ${chain.toUpperCase()}. Please set BTC_DEPOSIT_ADDRESS or ETH_DEPOSIT_ADDRESS in environment variables.`);
+    console.error(`Missing deposit address for ${chain.toUpperCase()}`);
     throw new Error(`Server configuration error: Missing ${chain.toUpperCase()} deposit address`);
   }
   return addr;
 }
 
-export default async function handler(req: any, res: any) {
+export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Add CORS headers
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
