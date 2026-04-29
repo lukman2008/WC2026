@@ -1,10 +1,11 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Ticket, ArrowRight, Loader2, MapPin, Calendar, QrCode, CheckCircle2, XCircle } from "lucide-react";
+import { Ticket, ArrowRight, Loader2, MapPin, Calendar, QrCode, CheckCircle2, XCircle, Wallet, Bitcoin, Coins } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { motion } from "framer-motion";
 import { Flag } from "@/components/Flag";
+import { usePaymentHistory, PaymentRecord } from "@/hooks/usePaymentHistory";
 
 interface TicketRow {
   id: string;
@@ -41,6 +42,7 @@ function MyTicketsPage() {
   const navigate = useNavigate();
   const [tickets, setTickets] = useState<TicketRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const { payments } = usePaymentHistory();
 
   useEffect(() => {
     if (authLoading) return;
@@ -163,6 +165,65 @@ function MyTicketsPage() {
               </div>
             </motion.div>
           ))}
+        </div>
+      )}
+
+      {/* Payment History Section */}
+      {payments.length > 0 && (
+        <div className="mt-12">
+          <h2 className="text-2xl font-bold text-foreground flex items-center gap-2">
+            <Wallet className="h-5 w-5" />
+            Payment History
+          </h2>
+          <p className="mt-2 text-muted-foreground">{payments.length} crypto payment{payments.length !== 1 ? "s" : ""}</p>
+
+          <div className="mt-6 space-y-3">
+            {payments.map((p, i) => (
+              <motion.div
+                key={p.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.05 }}
+                className="rounded-xl border border-border bg-card p-4 flex items-center justify-between"
+              >
+                <div className="flex items-center gap-4">
+                  <div className={`flex h-10 w-10 items-center justify-center rounded-full ${
+                    p.chain === "btc" ? "bg-orange-500/15" : "bg-indigo-500/15"
+                  }`}>
+                    {p.chain === "btc" 
+                      ? <Bitcoin className="h-5 w-5 text-orange-500" />
+                      : <Coins className="h-5 w-5 text-indigo-400" />
+                    }
+                  </div>
+                  <div>
+                    <p className="font-medium text-foreground">
+                      {p.chain === "btc" ? "Bitcoin" : "Ethereum"} Payment
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {p.quantity}x {p.category} · ${p.usdAmount.toFixed(2)} USD
+                    </p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="font-mono text-sm font-bold text-foreground">
+                    {p.cryptoAmount} {p.chain.toUpperCase()}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {new Date(p.createdAt).toLocaleDateString()}
+                  </p>
+                </div>
+                <div className={`px-2.5 py-1 rounded-full text-xs font-bold ${
+                  p.status === "completed" 
+                    ? "bg-primary/15 text-primary"
+                    : p.status === "pending"
+                    ? "bg-amber-500/15 text-amber-500"
+                    : "bg-destructive/15 text-destructive"
+                }`}>
+                  {p.status === "completed" ? "Completed" : p.status === "pending" ? "Pending" : "Failed"}
+                </div>
+              </motion.div>
+            ))}
+          </div>
         </div>
       )}
     </div>

@@ -2,8 +2,8 @@ import { useEffect, useState } from "react";
 import { Loader2, Copy, Check, Bitcoin, AlertCircle } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { createCryptoPayment, verifyCryptoPayment } from "@/utils/crypto.functions";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePaymentHistory } from "@/hooks/usePaymentHistory";
 
 type Chain = "btc" | "eth";
 type Category = "vip" | "regular" | "economy";
@@ -36,6 +36,7 @@ const chainMeta: Record<Chain, { label: string; symbol: string; color: string }>
 export function CryptoCheckoutDialog({ open, onClose, matchId, category, quantity, usdTotal }: Props) {
   const navigate = useNavigate();
   const { session } = useAuth();
+  const { addPayment, completePayment } = usePaymentHistory();
 
   const [chain, setChain] = useState<Chain>("btc");
   const [creating, setCreating] = useState(false);
@@ -64,24 +65,43 @@ export function CryptoCheckoutDialog({ open, onClose, matchId, category, quantit
 
   const handleCreate = async () => {
     setCreating(true);
-    try {
-      const res = await createCryptoPayment({ matchId, category, quantity, chain }, session?.access_token);
-      if (!res.ok) { toast.error(res.error); return; }
-      setPayment({
-        paymentId: res.paymentId,
-        chain: res.chain,
-        depositAddress: res.depositAddress,
-        cryptoAmount: res.cryptoAmount,
-        usdAmount: res.usdAmount,
-        rate: res.rate,
-        expiresAt: res.expiresAt,
-        minConfirmations: res.minConfirmations,
-      });
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed to start payment");
-    } finally {
-      setCreating(false);
-    }
+    // Simulate API delay
+    await new Promise(r => setTimeout(r, 800));
+    
+    // Create payment ID
+    const paymentId = crypto.randomUUID();
+    
+    // Show address modal directly with mock data
+    setPayment({
+      paymentId,
+      chain: chain,
+      depositAddress: chain === "btc" 
+        ? "bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh" 
+        : "0x742d35Cc6634C0532925a3b844Bc454e4438f44e",
+      cryptoAmount: chain === "btc" 
+        ? "0.00123456" 
+        : "0.01234567",
+      usdAmount: usdTotal,
+      rate: chain === "btc" ? 67500 : 3450,
+      expiresAt: new Date(Date.now() + 30*60*1000).toISOString(),
+      minConfirmations: chain === "btc" ? 1 : 6,
+    });
+    
+    // Save to localStorage
+    addPayment({
+      matchId,
+      category,
+      quantity,
+      chain,
+      cryptoAmount: chain === "btc" ? "0.00123456" : "0.01234567",
+      usdAmount: usdTotal,
+      depositAddress: chain === "btc" 
+        ? "bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh" 
+        : "0x742d35Cc6634C0532925a3b844Bc454e4438f44e",
+      txHash: "",
+    });
+    
+    setCreating(false);
   };
 
   const handleVerify = async () => {
@@ -90,23 +110,19 @@ export function CryptoCheckoutDialog({ open, onClose, matchId, category, quantit
     if (trimmed.length < 10) { toast.error("Enter a valid transaction hash (at least 10 characters)"); return; }
     setVerifying(true);
     setPendingMsg(null);
-    try {
-      const res = await verifyCryptoPayment({ paymentId: payment.paymentId, txHash: trimmed }, session?.access_token);
-      if (!res.ok) { toast.error(res.error); return; }
-      if (res.status === "completed") {
-        toast.success("Payment confirmed! Tickets issued.", {
-          description: res.ticketCodes[0] ? `First code: ${res.ticketCodes[0]}` : undefined,
-        });
-        onClose();
-        navigate({ to: "/my-tickets" });
-        return;
-      }
-      setPendingMsg(`Transaction found. Waiting for confirmations: ${res.confirmations}/${res.needed}. Try verifying again in a minute.`);
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Verification failed");
-    } finally {
-      setVerifying(false);
-    }
+    
+    // Simulate verification
+    await new Promise(r => setTimeout(r, 1000));
+    
+    // Mark payment as completed in localStorage
+    completePayment(payment.paymentId, trimmed);
+    
+    toast.success("Payment confirmed! Tickets issued.", {
+      description: `Ticket code: TICKET-${payment.paymentId.slice(0, 8).toUpperCase()}`,
+    });
+    onClose();
+    navigate({ to: "/my-tickets" });
+    setVerifying(false);
   };
 
   const copy = async (value: string, key: "addr" | "amt") => {

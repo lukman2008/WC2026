@@ -44,7 +44,7 @@ export const createCryptoPayment = async (
       Object.assign(headers, authHeaders);
     }
 
-    const response = await fetch("/api/payment/create", {
+    const response = await fetch(import.meta.env.DEV ? "http://localhost:3001/api/payment/create" : "/api/payment/create", {
       method: "POST",
       headers,
       body: JSON.stringify(createInput.parse(input)),
@@ -80,7 +80,7 @@ export const verifyCryptoPayment = async (
       Object.assign(headers, authHeaders);
     }
 
-    const response = await fetch("/api/payment/verify", {
+    const response = await fetch(import.meta.env.DEV ? "http://localhost:3001/api/payment/verify" : "/api/payment/verify", {
       method: "POST",
       headers,
       body: JSON.stringify(verifyInput.parse(input)),

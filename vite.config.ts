@@ -15,26 +15,6 @@ export default defineConfig({
   server: {
     host: "::",
     port: 5173,
-    proxy: {
-      "/api": {
-        target: "http://localhost:3000",
-        changeOrigin: true,
-        secure: false,
-        // This proxy is only used if you run "npm run dev".
-        // If you run "vercel dev", Vercel handles the /api routing automatically.
-        configure: (proxy, _options) => {
-          proxy.on('error', (err, _req, res) => {
-            if (!res.headersSent) {
-              res.writeHead(502, { 'Content-Type': 'application/json' });
-            }
-            res.end(JSON.stringify({ 
-              error: 'API Server Not Found', 
-              message: 'Local API is not running. To fix this: 1. Install Vercel CLI (npm i -g vercel) 2. Run "npm run dev:all"' 
-            }));
-          });
-        },
-      },
-    },
   },
   build: {
     outDir: "dist",

@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite dev",
     "dev:all": "vercel dev",
+    "dev:api": "node dev-server.ts",
+    "dev:both": "npm run dev:api & npm run dev & wait",
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
