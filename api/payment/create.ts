@@ -31,10 +31,9 @@ async function getUsdRate(chain: "btc" | "eth"): Promise<number> {
 }
 
 function getDepositAddress(chain: "btc" | "eth"): string {
-  // Use hardcoded fallback addresses for Vercel deployment
   const addr = chain === "btc" 
-    ? (process.env.BTC_DEPOSIT_ADDRESS || "bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh")
-    : (process.env.ETH_DEPOSIT_ADDRESS || "0x742d35Cc6634C0532925a3b844Bc454e4438f44e");
+    ? (process.env.BTC_DEPOSIT_ADDRESS || process.env.VITE_BTC_DEPOSIT_ADDRESS || "bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh")
+    : (process.env.ETH_DEPOSIT_ADDRESS || process.env.VITE_ETH_DEPOSIT_ADDRESS || "0x742d35Cc6634C0532925a3b844Bc454e4438f44e");
   
   if (!addr) {
     console.error(`Missing deposit address for ${chain.toUpperCase()}`);
@@ -44,14 +43,15 @@ function getDepositAddress(chain: "btc" | "eth"): string {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // Add CORS headers
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
-  res.setHeader(
-    'Access-Control-Allow-Headers',
-    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization'
-  );
+  const origin = req.headers.origin;
+  if (origin) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Vary", "Origin");
+  } else {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+  }
+  res.setHeader("Access-Control-Allow-Methods", "OPTIONS, POST");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
@@ -67,7 +67,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const token = authHeader.split(" ")[1];
 
     const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-    const supabaseKey = process.env.SUPABASE_PUBLISHABLE_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+    const supabaseKey =
+      process.env.SUPABASE_SERVICE_ROLE_KEY ||
+      process.env.SUPABASE_PUBLISHABLE_KEY ||
+      process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
     if (!supabaseUrl || !supabaseKey) {
       console.error("Missing Supabase environment variables");
