@@ -21,6 +21,8 @@ export type Database = {
           confirmations: number
           created_at: string
           crypto_amount: number
+          display_currency: string | null
+          display_total: number | null
           deposit_address: string
           error_message: string | null
           expires_at: string
@@ -28,6 +30,8 @@ export type Database = {
           match_id: string
           quantity: number
           rate_usd_per_unit: number
+          seat_multiplier: number | null
+          seat_section: string | null
           status: Database["public"]["Enums"]["crypto_payment_status"]
           transaction_id: string | null
           tx_hash: string | null
@@ -41,6 +45,8 @@ export type Database = {
           confirmations?: number
           created_at?: string
           crypto_amount: number
+          display_currency?: string | null
+          display_total?: number | null
           deposit_address: string
           error_message?: string | null
           expires_at: string
@@ -48,6 +54,8 @@ export type Database = {
           match_id: string
           quantity: number
           rate_usd_per_unit: number
+          seat_multiplier?: number | null
+          seat_section?: string | null
           status?: Database["public"]["Enums"]["crypto_payment_status"]
           transaction_id?: string | null
           tx_hash?: string | null
@@ -61,6 +69,8 @@ export type Database = {
           confirmations?: number
           created_at?: string
           crypto_amount?: number
+          display_currency?: string | null
+          display_total?: number | null
           deposit_address?: string
           error_message?: string | null
           expires_at?: string
@@ -68,6 +78,8 @@ export type Database = {
           match_id?: string
           quantity?: number
           rate_usd_per_unit?: number
+          seat_multiplier?: number | null
+          seat_section?: string | null
           status?: Database["public"]["Enums"]["crypto_payment_status"]
           transaction_id?: string | null
           tx_hash?: string | null

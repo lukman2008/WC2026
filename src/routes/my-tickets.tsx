@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { motion } from "framer-motion";
 import { Flag } from "@/components/Flag";
 import { usePaymentHistory, PaymentRecord } from "@/hooks/usePaymentHistory";
+import { detectCryptoPayment } from "@/utils/crypto.functions";
 
 interface TicketRow {
   id: string;
@@ -38,11 +39,20 @@ export const Route = createFileRoute("/my-tickets")({
 });
 
 function MyTicketsPage() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, session, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [tickets, setTickets] = useState<TicketRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const { payments } = usePaymentHistory();
+  const { payments, loading: paymentsLoading, refresh: refreshPayments } = usePaymentHistory();
+  const [checkingPaymentId, setCheckingPaymentId] = useState<string | null>(null);
+
+  const loadTickets = async () => {
+    const { data } = await supabase
+      .from("tickets")
+      .select("id, ticket_code, category, price, status, qr_data, created_at, matches(home_team, away_team, home_flag, away_flag, stadium, city, match_date, stage)")
+      .order("created_at", { ascending: false });
+    setTickets((data as TicketRow[]) ?? []);
+  };
 
   useEffect(() => {
     if (authLoading) return;
@@ -51,14 +61,24 @@ function MyTicketsPage() {
       return;
     }
     (async () => {
-      const { data } = await supabase
-        .from("tickets")
-        .select("id, ticket_code, category, price, status, qr_data, created_at, matches(home_team, away_team, home_flag, away_flag, stadium, city, match_date, stage)")
-        .order("created_at", { ascending: false });
-      setTickets((data as TicketRow[]) ?? []);
+      await loadTickets();
       setLoading(false);
     })();
   }, [user, authLoading, navigate]);
+
+  const checkPaymentStatus = async (p: PaymentRecord) => {
+    if (!session?.access_token) return;
+    setCheckingPaymentId(p.id);
+    try {
+      const res = await detectCryptoPayment({ paymentId: p.id }, session.access_token);
+      await refreshPayments();
+      if (res.ok && res.status === "completed") {
+        await loadTickets();
+      }
+    } finally {
+      setCheckingPaymentId(null);
+    }
+  };
 
   if (authLoading || loading) {
     return (
@@ -169,57 +189,85 @@ function MyTicketsPage() {
       )}
 
       {/* Payment History Section */}
-      {payments.length > 0 && (
+      {(paymentsLoading || payments.length > 0) && (
         <div className="mt-12">
           <h2 className="text-2xl font-bold text-foreground flex items-center gap-2">
             <Wallet className="h-5 w-5" />
             Payment History
           </h2>
-          <p className="mt-2 text-muted-foreground">{payments.length} crypto payment{payments.length !== 1 ? "s" : ""}</p>
+          {!paymentsLoading && (
+            <p className="mt-2 text-muted-foreground">{payments.length} crypto payment{payments.length !== 1 ? "s" : ""}</p>
+          )}
 
           <div className="mt-6 space-y-3">
-            {payments.map((p, i) => (
+            {paymentsLoading ? (
+              <div className="rounded-xl border border-border bg-card p-4 flex items-center gap-3">
+                <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                <span className="text-sm text-muted-foreground">Loading payments…</span>
+              </div>
+            ) : payments.map((p, i) => (
               <motion.div
                 key={p.id}
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.05 }}
-                className="rounded-xl border border-border bg-card p-4 flex items-center justify-between"
+                className="rounded-xl border border-border bg-card p-4"
               >
-                <div className="flex items-center gap-4">
-                  <div className={`flex h-10 w-10 items-center justify-center rounded-full ${
-                    p.chain === "btc" ? "bg-orange-500/15" : "bg-indigo-500/15"
-                  }`}>
-                    {p.chain === "btc" 
-                      ? <Bitcoin className="h-5 w-5 text-orange-500" />
-                      : <Coins className="h-5 w-5 text-indigo-400" />
-                    }
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-start gap-4">
+                    <div className={`flex h-10 w-10 items-center justify-center rounded-full ${
+                      p.chain === "btc" ? "bg-orange-500/15" : "bg-indigo-500/15"
+                    }`}>
+                      {p.chain === "btc"
+                        ? <Bitcoin className="h-5 w-5 text-orange-500" />
+                        : <Coins className="h-5 w-5 text-indigo-400" />
+                      }
+                    </div>
+                    <div>
+                      <p className="font-medium text-foreground">{p.chain === "btc" ? "Bitcoin" : "Ethereum"} Payment</p>
+                      <p className="text-xs text-muted-foreground">
+                        {p.quantity}x {p.category} · ${p.usdAmount.toFixed(2)} USD
+                        {p.displayCurrency && typeof p.displayTotal === "number" ? ` · ≈ ${p.displayTotal.toLocaleString(undefined, { style: "currency", currency: p.displayCurrency })}` : ""}
+                      </p>
+                      {p.seatSection && (
+                        <p className="mt-1 text-xs text-muted-foreground">Section: <span className="font-semibold text-foreground">{p.seatSection}</span></p>
+                      )}
+                      {p.txHash && (
+                        <p className="mt-1 text-[11px] text-muted-foreground">TX: <span className="font-mono text-foreground">{p.txHash.slice(0, 10)}…{p.txHash.slice(-8)}</span></p>
+                      )}
+                      {p.status === "confirming" || p.status === "submitted" ? (
+                        <p className="mt-1 text-[11px] text-muted-foreground">Confirmations: <span className="font-mono text-foreground">{p.confirmations}</span></p>
+                      ) : null}
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-medium text-foreground">
-                      {p.chain === "btc" ? "Bitcoin" : "Ethereum"} Payment
+                  <div className="text-right">
+                    <p className="font-mono text-sm font-bold text-foreground">
+                      {p.cryptoAmount} {p.chain.toUpperCase()}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {p.quantity}x {p.category} · ${p.usdAmount.toFixed(2)} USD
+                      {new Date(p.createdAt).toLocaleDateString()}
                     </p>
+                    {(p.status === "awaiting_payment" || p.status === "submitted" || p.status === "confirming") && (
+                      <button
+                        onClick={() => checkPaymentStatus(p)}
+                        disabled={!session?.access_token || checkingPaymentId === p.id}
+                        className="mt-2 inline-flex items-center justify-center rounded-lg border border-border bg-background px-3 py-1.5 text-[11px] font-semibold text-foreground hover:bg-secondary/50 disabled:opacity-60"
+                      >
+                        {checkingPaymentId === p.id ? "Checking..." : "Check status"}
+                      </button>
+                    )}
+                    <div className={`mt-2 inline-flex px-2.5 py-1 rounded-full text-xs font-bold ${
+                      p.status === "completed"
+                        ? "bg-primary/15 text-primary"
+                        : p.status === "awaiting_payment"
+                          ? "bg-amber-500/15 text-amber-500"
+                          : p.status === "submitted" || p.status === "confirming"
+                            ? "bg-indigo-500/15 text-indigo-400"
+                            : "bg-destructive/15 text-destructive"
+                    }`}>
+                      {p.status === "awaiting_payment" ? "Awaiting Payment" : p.status === "submitted" ? "Submitted" : p.status === "confirming" ? "Confirming" : p.status === "completed" ? "Completed" : p.status === "expired" ? "Expired" : "Failed"}
+                    </div>
                   </div>
-                </div>
-                <div className="text-right">
-                  <p className="font-mono text-sm font-bold text-foreground">
-                    {p.cryptoAmount} {p.chain.toUpperCase()}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {new Date(p.createdAt).toLocaleDateString()}
-                  </p>
-                </div>
-                <div className={`px-2.5 py-1 rounded-full text-xs font-bold ${
-                  p.status === "completed" 
-                    ? "bg-primary/15 text-primary"
-                    : p.status === "pending"
-                    ? "bg-amber-500/15 text-amber-500"
-                    : "bg-destructive/15 text-destructive"
-                }`}>
-                  {p.status === "completed" ? "Completed" : p.status === "pending" ? "Pending" : "Failed"}
                 </div>
               </motion.div>
             ))}

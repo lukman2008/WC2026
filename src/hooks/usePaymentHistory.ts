@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 export interface PaymentRecord {
   id: string;
@@ -9,92 +10,71 @@ export interface PaymentRecord {
   cryptoAmount: string;
   usdAmount: number;
   depositAddress: string;
-  txHash: string;
-  status: "pending" | "completed" | "failed";
+  txHash: string | null;
+  confirmations: number;
+  status: "awaiting_payment" | "submitted" | "confirming" | "completed" | "failed" | "expired";
   createdAt: string;
-  completedAt?: string;
-}
-
-const STORAGE_KEY = "goal-getter-payments";
-
-function getStoredPayments(): PaymentRecord[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    return stored ? JSON.parse(stored) : [];
-  } catch {
-    return [];
-  }
-}
-
-function savePayments(payments: PaymentRecord[]): void {
-  if (typeof window !== "undefined") {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(payments));
-  }
+  seatSection: string | null;
+  displayCurrency: string | null;
+  displayTotal: number | null;
 }
 
 export function usePaymentHistory() {
   const [payments, setPayments] = useState<PaymentRecord[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Load on mount
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    const full = await supabase
+      .from("crypto_payments")
+      .select("id, match_id, category, quantity, chain, crypto_amount, usd_amount, deposit_address, tx_hash, confirmations, status, created_at, seat_section, display_currency, display_total")
+      .order("created_at", { ascending: false });
+
+    const needsFallback = full.error?.message?.includes("schema cache");
+    const base = needsFallback
+      ? await supabase
+          .from("crypto_payments")
+          .select("id, match_id, category, quantity, chain, crypto_amount, usd_amount, deposit_address, tx_hash, confirmations, status, created_at")
+          .order("created_at", { ascending: false })
+      : null;
+
+    const { data, error } = needsFallback && base ? base : full;
+
+    if (error || !data) {
+      setPayments([]);
+      setLoading(false);
+      return;
+    }
+
+    setPayments(
+      data.map((p: any) => ({
+        id: p.id,
+        matchId: p.match_id,
+        category: p.category,
+        quantity: p.quantity,
+        chain: p.chain,
+        cryptoAmount: String(p.crypto_amount),
+        usdAmount: Number(p.usd_amount),
+        depositAddress: p.deposit_address,
+        txHash: p.tx_hash,
+        confirmations: Number(p.confirmations ?? 0),
+        status: p.status,
+        createdAt: p.created_at,
+        seatSection: p.seat_section ?? null,
+        displayCurrency: p.display_currency ?? null,
+        displayTotal: p.display_total ?? null,
+      }))
+    );
+    setLoading(false);
+  }, []);
+
   useEffect(() => {
-    setPayments(getStoredPayments());
-  }, []);
-
-  const addPayment = useCallback((payment: Omit<PaymentRecord, "id" | "status" | "createdAt">) => {
-    const newPayment: PaymentRecord = {
-      ...payment,
-      id: crypto.randomUUID(),
-      status: "pending",
-      createdAt: new Date().toISOString(),
-    };
-    
-    setPayments(prev => {
-      const updated = [newPayment, ...prev];
-      savePayments(updated);
-      return updated;
-    });
-    return newPayment;
-  }, []);
-
-  const completePayment = useCallback((id: string, txHash: string) => {
-    setPayments(prev => {
-      const updated = prev.map(p => 
-        p.id === id 
-          ? { ...p, status: "completed" as const, txHash, completedAt: new Date().toISOString() }
-          : p
-      );
-      savePayments(updated);
-      return updated;
-    });
-  }, []);
-
-  const failPayment = useCallback((id: string) => {
-    setPayments(prev => {
-      const updated = prev.map(p => 
-        p.id === id 
-          ? { ...p, status: "failed" as const }
-          : p
-      );
-      savePayments(updated);
-      return updated;
-    });
-  }, []);
-
-  const getPaymentsByMatch = useCallback((matchId: string) => {
-    return payments.filter(p => p.matchId === matchId);
-  }, [payments]);
-
-  const getUserPayments = useCallback(() => {
-    return payments;
-  }, [payments]);
+    refresh();
+  }, [refresh]);
 
   return {
     payments,
-    addPayment,
-    completePayment,
-    failPayment,
-    getPaymentsByMatch,
-    getUserPayments,
+    loading,
+    refresh,
   };
 }

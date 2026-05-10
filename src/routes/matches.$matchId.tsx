@@ -48,6 +48,27 @@ const categoryInfo: Record<Category, { label: string; desc: string; color: strin
   economy: { label: "Economy", desc: "Standard seating, perfect for the full atmosphere experience", color: "bg-secondary text-secondary-foreground" },
 };
 
+const seatSectionsByCategory: Record<Category, { name: string; multiplier: number }[]> = {
+  vip: [
+    { name: "VIP Club A", multiplier: 1.35 },
+    { name: "VIP Club B", multiplier: 1.2 },
+    { name: "VIP Upper", multiplier: 1.05 },
+  ],
+  regular: [
+    { name: "Center", multiplier: 1.15 },
+    { name: "Corner", multiplier: 1.0 },
+    { name: "Upper Center", multiplier: 0.9 },
+  ],
+  economy: [
+    { name: "Upper Sideline", multiplier: 1.0 },
+    { name: "Upper Corner", multiplier: 0.9 },
+    { name: "Upper End", multiplier: 0.85 },
+  ],
+};
+
+const currencyOptions = ["USD", "EUR", "GBP", "NGN", "CAD"] as const;
+type Currency = (typeof currencyOptions)[number];
+
 function MatchDetailPage() {
   const { matchId } = Route.useParams();
   const navigate = useNavigate();
@@ -58,6 +79,10 @@ function MatchDetailPage() {
   const [quantity, setQuantity] = useState(1);
   const [purchasing, setPurchasing] = useState(false);
   const [cryptoOpen, setCryptoOpen] = useState(false);
+  const [seatSection, setSeatSection] = useState<string | null>(seatSectionsByCategory.regular[0]?.name ?? null);
+  const [seatMultiplier, setSeatMultiplier] = useState<number>(seatSectionsByCategory.regular[0]?.multiplier ?? 1);
+  const [currency, setCurrency] = useState<Currency>("USD");
+  const [fxRate, setFxRate] = useState<number | null>(null);
 
   const loadMatch = async () => {
     const { data, error } = await supabase
@@ -76,6 +101,35 @@ function MatchDetailPage() {
     loadMatch();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [matchId]);
+
+  useEffect(() => {
+    const opts = seatSectionsByCategory[category];
+    const first = opts[0];
+    setSeatSection(first?.name ?? null);
+    setSeatMultiplier(first?.multiplier ?? 1);
+  }, [category]);
+
+  useEffect(() => {
+    if (currency === "USD") {
+      setFxRate(1);
+      return;
+    }
+    let cancelled = false;
+    const run = async () => {
+      try {
+        const res = await fetch("https://open.er-api.com/v6/latest/USD");
+        if (!res.ok) throw new Error(`FX error (${res.status})`);
+        const json = (await res.json()) as any;
+        const rate = Number(json?.rates?.[currency]);
+        if (!rate || rate <= 0) throw new Error("Invalid FX rate");
+        if (!cancelled) setFxRate(rate);
+      } catch (_e) {
+        if (!cancelled) setFxRate(null);
+      }
+    };
+    run();
+    return () => { cancelled = true; };
+  }, [currency]);
 
   const handlePurchase = async () => {
     if (!user) {
@@ -113,7 +167,8 @@ function MatchDetailPage() {
   const priceMap = { vip: match.price_vip, regular: match.price_regular, economy: match.price_economy };
   const available = availableMap[category];
   const pricePerTicket = Number(priceMap[category]);
-  const total = pricePerTicket * quantity;
+  const total = pricePerTicket * quantity * seatMultiplier;
+  const displayTotal = fxRate ? total * fxRate : null;
 
   return (
     <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10">
@@ -260,6 +315,44 @@ function MatchDetailPage() {
               </div>
             </div>
 
+            <div className="mt-6">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium text-foreground">Choose section</label>
+                <span className="text-[10px] text-muted-foreground">Zone pricing</span>
+              </div>
+              <div className="mt-2 grid grid-cols-3 gap-2">
+                {seatSectionsByCategory[category].map(s => {
+                  const selected = seatSection === s.name;
+                  return (
+                    <button
+                      key={s.name}
+                      onClick={() => { setSeatSection(s.name); setSeatMultiplier(s.multiplier); }}
+                      className={`rounded-lg border p-3 text-left transition-all ${selected ? "border-primary bg-primary/5 shadow-glow-primary" : "border-border hover:border-muted-foreground/30"}`}
+                    >
+                      <p className="text-xs font-semibold text-foreground">{s.name}</p>
+                      <p className="mt-1 text-[11px] text-muted-foreground">×{s.multiplier.toFixed(2)}</p>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="mt-6">
+              <label className="text-sm font-medium text-foreground">Currency</label>
+              <select
+                value={currency}
+                onChange={(e) => setCurrency(e.target.value as Currency)}
+                className="mt-2 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
+              >
+                {currencyOptions.map(c => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+              {currency !== "USD" && fxRate === null && (
+                <p className="mt-2 text-[11px] text-muted-foreground">Live FX temporarily unavailable. Showing USD only.</p>
+              )}
+            </div>
+
             {/* Payment method — crypto only */}
             <div className="mt-6 flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 p-3">
               <Bitcoin className="h-5 w-5 text-primary" />
@@ -271,13 +364,19 @@ function MatchDetailPage() {
 
             <div className="mt-5 rounded-lg bg-secondary/50 p-4 space-y-2">
               <div className="flex items-center justify-between text-sm text-muted-foreground">
-                <span>{categoryInfo[category].label} × {quantity}</span>
+                <span>{categoryInfo[category].label} × {quantity}{seatSection ? ` · ${seatSection}` : ""}</span>
                 <span>${pricePerTicket} each</span>
               </div>
               <div className="border-t border-border pt-2 flex items-center justify-between">
                 <span className="text-sm font-semibold text-foreground">Total</span>
                 <span className="text-xl font-bold text-gradient-primary">${total.toLocaleString()}</span>
               </div>
+              {currency !== "USD" && displayTotal !== null && (
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>Approx.</span>
+                  <span>{displayTotal.toLocaleString(undefined, { style: "currency", currency })}</span>
+                </div>
+              )}
             </div>
 
             <button
@@ -290,7 +389,7 @@ function MatchDetailPage() {
                 ? "Processing..."
                 : !user
                   ? "Sign in to Buy"
-                  : `Pay with Crypto — $${total.toLocaleString()}`}
+                    : `Pay with Crypto — $${total.toLocaleString()}`}
             </button>
 
             <div className="mt-4 flex items-center justify-center gap-2 text-xs text-muted-foreground">
@@ -308,6 +407,10 @@ function MatchDetailPage() {
         category={category}
         quantity={quantity}
         usdTotal={total}
+        seatSection={seatSection}
+        seatMultiplier={seatMultiplier}
+        displayCurrency={currency}
+        displayTotal={displayTotal ?? undefined}
       />
     </div>
   );

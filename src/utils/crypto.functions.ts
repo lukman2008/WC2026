@@ -7,6 +7,10 @@ const createInput = z.object({
   category: z.enum(["vip", "regular", "economy"]),
   quantity: z.number().int().min(1).max(10),
   chain: z.enum(["btc", "eth"]),
+  seatSection: z.string().min(1).max(80).optional(),
+  seatMultiplier: z.number().min(0.8).max(2.0).optional(),
+  displayCurrency: z.string().min(3).max(6).optional(),
+  displayTotal: z.number().min(0).optional(),
 });
 
 const verifyInput = z.object({
@@ -20,8 +24,14 @@ export type CreateResult =
   | { ok: false; error: string };
 
 export type VerifyApiResult =
-  | { ok: true; status: "completed"; ticketCodes: string[] }
+  | { ok: true; status: "completed"; ticketCodes: string[]; emailSent?: boolean }
   | { ok: true; status: "confirming"; confirmations: number; needed: number }
+  | { ok: false; error: string };
+
+export type DetectApiResult =
+  | { ok: true; status: "awaiting_payment" }
+  | { ok: true; status: "confirming"; txHash?: string; confirmations: number; needed: number }
+  | { ok: true; status: "completed"; ticketCodes: string[]; emailSent?: boolean }
   | { ok: false; error: string };
 
 // ============ API Callers ============
@@ -106,15 +116,33 @@ async function createCryptoPaymentViaSupabase(
     return { ok: false, error: `Only ${availMap[parsed.category]} ${parsed.category} tickets left.` };
   }
 
-  const usdAmount = +(priceMap[parsed.category] * parsed.quantity).toFixed(2);
+  const seatMultiplier = parsed.seatMultiplier ?? 1;
+  const usdAmount = +(priceMap[parsed.category] * parsed.quantity * seatMultiplier).toFixed(2);
   const rate = await getUsdRate(parsed.chain);
   const cryptoAmount = +(usdAmount / rate).toFixed(8);
   const depositAddress = getDepositAddress(parsed.chain);
   const expiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString();
 
-  const { data: row, error: insErr } = await supabase
-    .from("crypto_payments")
-    .insert({
+  const payloadWithExtras: any = {
+    user_id: user.id,
+    match_id: parsed.matchId,
+    category: parsed.category,
+    quantity: parsed.quantity,
+    chain: parsed.chain,
+    deposit_address: depositAddress,
+    usd_amount: usdAmount,
+    crypto_amount: cryptoAmount,
+    rate_usd_per_unit: rate,
+    seat_section: parsed.seatSection ?? null,
+    seat_multiplier: parsed.seatMultiplier ?? null,
+    display_currency: parsed.displayCurrency ?? null,
+    display_total: parsed.displayTotal ?? null,
+    expires_at: expiresAt,
+  };
+
+  let insertRes = await supabase.from("crypto_payments").insert(payloadWithExtras).select("id").single();
+  if (insertRes.error?.message?.includes("schema cache")) {
+    const payloadBase: any = {
       user_id: user.id,
       match_id: parsed.matchId,
       category: parsed.category,
@@ -125,9 +153,11 @@ async function createCryptoPaymentViaSupabase(
       crypto_amount: cryptoAmount,
       rate_usd_per_unit: rate,
       expires_at: expiresAt,
-    })
-    .select("id")
-    .single();
+    };
+    insertRes = await supabase.from("crypto_payments").insert(payloadBase).select("id").single();
+  }
+
+  const { data: row, error: insErr } = insertRes;
 
   if (insErr || !row) return { ok: false, error: insErr?.message || "Could not create payment" };
 
@@ -226,6 +256,41 @@ export const verifyCryptoPayment = async (
     return await response.json();
   } catch (e) {
     console.error("verifyCryptoPayment error:", e);
+    return { ok: false, error: e instanceof Error ? e.message : "Unexpected error" };
+  }
+};
+
+export const detectCryptoPayment = async (
+  input: { paymentId: string },
+  token?: string
+): Promise<DetectApiResult> => {
+  try {
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    } else {
+      const authHeaders = await getAuthHeaders();
+      Object.assign(headers, authHeaders);
+    }
+
+    const response = await fetchApi("/api/payment/detect", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ paymentId: input.paymentId }),
+    });
+
+    if (!response.ok) {
+      let errorData;
+      try {
+        errorData = await response.json();
+      } catch (_e) {
+        errorData = { error: `Server error: ${response.statusText}` };
+      }
+      return { ok: false, error: errorData.message || errorData.error || "Failed to detect payment" };
+    }
+
+    return await response.json();
+  } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Unexpected error" };
   }
 };

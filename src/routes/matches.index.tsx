@@ -1,260 +1,250 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { ChevronDown, ChevronLeft, ChevronRight, Settings, Apple, Smartphone, Loader2, Globe2, ChevronRight as ChevronRightIcon } from "lucide-react";
-import { Flag } from "@/components/Flag";
+import { Loader2, Search, SlidersHorizontal, X } from "lucide-react";
+import { MatchCard } from "@/components/MatchCard";
 import { supabase } from "@/integrations/supabase/client";
+import type { Match } from "@/lib/match-data";
 
 export const Route = createFileRoute("/matches/")({
   head: () => ({
     meta: [
-      { title: "TV Schedules — International Football Matches" },
-      { name: "description", content: "Round-by-round TV schedule with times shown in your local timezone." },
-      { property: "og:title", content: "TV Schedules — International Football" },
-      { property: "og:description", content: "Browse upcoming international matches by round and date in your local time." },
+      { title: "Browse Matches — FIFA World Cup 2026 Tickets" },
+      { name: "description", content: "Browse World Cup 2026 matches and buy tickets in VIP, Regular, or Economy." },
+      { property: "og:title", content: "Browse Matches — World Cup 2026 Tickets" },
+      { property: "og:description", content: "Pick your match, choose your section, and pay with crypto." },
     ],
   }),
-  component: TvSchedulesPage,
+  component: MatchesPage,
 });
 
 interface DbMatch {
   id: string;
   home_team: string;
   away_team: string;
+  home_flag: string;
+  away_flag: string;
   match_date: string;
+  group_name: string | null;
+  stage: string;
+  price_vip: number;
+  price_regular: number;
   price_economy: number;
+  available_vip: number;
+  available_regular: number;
+  available_economy: number;
   stadium: string;
   city: string;
 }
-
-interface ScheduleMatch {
-  id: string;
-  home: string;
-  away: string;
-  time: string;
-  dateLabel: string;
-  ts: number;
-  fromPrice: number;
-  stadium: string;
-  city: string;
-}
-interface DayGroup { date: string; matches: ScheduleMatch[]; }
-interface Round { label: string; days: DayGroup[]; }
-
-const ROUND_RANGES = [
-  { label: "Round 1", startISO: "2026-06-11T00:00:00Z", endISO: "2026-06-18T12:00:00Z" },
-  { label: "Round 2", startISO: "2026-06-18T12:00:00Z", endISO: "2026-06-24T12:00:00Z" },
-  { label: "Round 3", startISO: "2026-06-24T12:00:00Z", endISO: "2026-06-29T00:00:00Z" },
-];
 
 const detectedTZ = typeof Intl !== "undefined" ? Intl.DateTimeFormat().resolvedOptions().timeZone : "UTC";
 
-function autoLabel(tz: string) {
-  try {
-    const city = tz.split("/").pop()?.replace(/_/g, " ") ?? tz;
-    const abbr = new Intl.DateTimeFormat(undefined, { timeZone: tz, timeZoneName: "short" })
-      .formatToParts(new Date()).find(p => p.type === "timeZoneName")?.value ?? "";
-    return `${city} (${abbr})`;
-  } catch { return tz; }
-}
+type SortKey = "soonest" | "cheapest" | "availability";
 
-const TZ_OPTIONS: { label: string; value: string }[] = [
-  { label: `${autoLabel(detectedTZ)} — your region`, value: "__auto__" },
-  { label: "Lagos (WAT)", value: "Africa/Lagos" },
-  { label: "London (GMT/BST)", value: "Europe/London" },
-  { label: "Paris (CET)", value: "Europe/Paris" },
-  { label: "New York (EST)", value: "America/New_York" },
-  { label: "Chicago (CST)", value: "America/Chicago" },
-  { label: "Denver (MST)", value: "America/Denver" },
-  { label: "Los Angeles (PST)", value: "America/Los_Angeles" },
-  { label: "São Paulo (BRT)", value: "America/Sao_Paulo" },
-  { label: "Dubai (GST)", value: "Asia/Dubai" },
-  { label: "Mumbai (IST)", value: "Asia/Kolkata" },
-  { label: "Tokyo (JST)", value: "Asia/Tokyo" },
-  { label: "Sydney (AEDT)", value: "Australia/Sydney" },
-  { label: "UTC", value: "UTC" },
-];
-
-function formatDateLabel(d: Date, tz: string) {
-  return d.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", timeZone: tz });
-}
-function formatTime(d: Date, tz: string) {
-  return d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit", timeZone: tz });
-}
-function tzAbbrev(tz: string) {
-  try {
-    const parts = new Intl.DateTimeFormat(undefined, { timeZone: tz, timeZoneName: "short" }).formatToParts(new Date());
-    return parts.find(p => p.type === "timeZoneName")?.value ?? tz;
-  } catch { return tz; }
-}
-
-function CircleFlag({ team, size = 24 }: { team: string; size?: number }) {
-  return (
-    <span
-      className="relative inline-flex overflow-hidden rounded-full bg-muted shrink-0"
-      style={{ height: size, width: size }}
-    >
-      <Flag team={team} size={size} rounded={false} className="!h-full !w-full scale-150 object-cover" />
-    </span>
-  );
-}
-
-function MatchRow({ match }: { match: ScheduleMatch }) {
-  return (
-    <Link
-      to="/matches/$matchId"
-      params={{ matchId: match.id }}
-      className="group flex items-center gap-3 sm:gap-4 px-3 sm:px-4 py-3 transition-colors hover:bg-secondary/60 active:bg-secondary"
-    >
-      <div className="w-12 sm:w-14 shrink-0 text-xs sm:text-sm font-semibold tabular-nums text-foreground">
-        {match.time}
-      </div>
-      <div className="h-8 w-px bg-border shrink-0" />
-      <div className="flex-1 min-w-0 flex flex-col gap-1">
-        <div className="flex items-center gap-2 min-w-0">
-          <CircleFlag team={match.home} />
-          <span className="truncate text-sm font-medium text-foreground">{match.home}</span>
-        </div>
-        <div className="flex items-center gap-2 min-w-0">
-          <CircleFlag team={match.away} />
-          <span className="truncate text-sm font-medium text-foreground">{match.away}</span>
-        </div>
-        <div className="text-[11px] text-muted-foreground truncate mt-0.5">
-          {match.stadium} · {match.city}
-        </div>
-      </div>
-      <div className="hidden sm:block text-[11px] text-muted-foreground shrink-0">
-        from <span className="font-semibold text-foreground">${Math.round(match.fromPrice)}</span>
-      </div>
-      <ChevronRightIcon className="h-4 w-4 text-muted-foreground shrink-0 group-hover:text-foreground transition-colors" />
-    </Link>
-  );
-}
-
-function TvSchedulesPage() {
-  const [roundIdx, setRoundIdx] = useState(0);
-  const [dropdownOpen, setDropdownOpen] = useState(false);
+function MatchesPage() {
   const [dbMatches, setDbMatches] = useState<DbMatch[] | null>(null);
-  const activeTZ = detectedTZ;
+  const [query, setQuery] = useState("");
+  const [sort, setSort] = useState<SortKey>("soonest");
+  const [stage, setStage] = useState<string>("All");
+  const [city, setCity] = useState<string>("All");
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   useEffect(() => {
     let active = true;
     (async () => {
       const { data } = await supabase
         .from("matches")
-        .select("id,home_team,away_team,match_date,price_economy,stadium,city")
-        .gte("match_date", "2026-06-11")
-        .lt("match_date", "2026-06-29")
+        .select("id,home_team,away_team,home_flag,away_flag,match_date,group_name,stage,price_vip,price_regular,price_economy,available_vip,available_regular,available_economy,stadium,city")
         .order("match_date", { ascending: true });
-      if (active) setDbMatches(data ?? []);
+      if (active) setDbMatches((data as DbMatch[]) ?? []);
     })();
     return () => { active = false; };
   }, []);
 
-  const rounds: Round[] = useMemo(() => {
+  const matches: Match[] = useMemo(() => {
     if (!dbMatches) return [];
-    return ROUND_RANGES.map(r => {
-      const start = new Date(r.startISO).getTime();
-      const end = new Date(r.endISO).getTime();
-      const inRound = dbMatches.filter(m => {
-        const t = new Date(m.match_date).getTime();
-        return t >= start && t < end;
-      });
-      const byDay = new Map<string, ScheduleMatch[]>();
-      for (const m of inRound) {
-        const d = new Date(m.match_date);
-        const dateLabel = formatDateLabel(d, activeTZ);
-        const sm: ScheduleMatch = {
-          id: m.id,
-          home: m.home_team,
-          away: m.away_team,
-          time: formatTime(d, activeTZ),
-          dateLabel,
-          ts: d.getTime(),
-          fromPrice: Number(m.price_economy),
-          stadium: m.stadium,
-          city: m.city,
-        };
-        if (!byDay.has(dateLabel)) byDay.set(dateLabel, []);
-        byDay.get(dateLabel)!.push(sm);
-      }
-      const days: DayGroup[] = Array.from(byDay.entries())
-        .map(([date, matches]) => ({ date, matches: matches.sort((a, b) => a.ts - b.ts) }))
-        .sort((a, b) => a.matches[0].ts - b.matches[0].ts);
-      return { label: r.label, days };
+    const userTZ = detectedTZ;
+    return dbMatches.map(m => {
+      const d = new Date(m.match_date);
+      return {
+        id: m.id,
+        homeTeam: m.home_team,
+        awayTeam: m.away_team,
+        homeFlag: m.home_flag,
+        awayFlag: m.away_flag,
+        stadium: m.stadium,
+        city: m.city,
+        date: d.toISOString(),
+        time: d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", timeZone: userTZ }),
+        dateObj: d,
+        group: m.group_name || "",
+        stage: m.stage,
+        ticketsAvailable: { vip: m.available_vip, regular: m.available_regular, economy: m.available_economy },
+        prices: { vip: Number(m.price_vip), regular: Number(m.price_regular), economy: Number(m.price_economy) },
+        stadiumImage: "",
+      };
     });
-  }, [dbMatches, activeTZ]);
+  }, [dbMatches]);
 
-  const round = rounds[roundIdx];
-  const tz = tzAbbrev(activeTZ);
+  const stageOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const m of matches) set.add(m.stage);
+    return ["All", ...Array.from(set).sort()];
+  }, [matches]);
+
+  const cityOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const m of matches) set.add(m.city);
+    return ["All", ...Array.from(set).sort()];
+  }, [matches]);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const byStage = stage === "All" ? matches : matches.filter(m => m.stage === stage);
+    const byCity = city === "All" ? byStage : byStage.filter(m => m.city === city);
+    const byQuery = q.length === 0 ? byCity : byCity.filter(m => {
+      return (
+        m.homeTeam.toLowerCase().includes(q) ||
+        m.awayTeam.toLowerCase().includes(q) ||
+        m.city.toLowerCase().includes(q) ||
+        m.stadium.toLowerCase().includes(q) ||
+        m.stage.toLowerCase().includes(q) ||
+        m.group.toLowerCase().includes(q)
+      );
+    });
+
+    const sorted = [...byQuery].sort((a, b) => {
+      if (sort === "soonest") return a.dateObj.getTime() - b.dateObj.getTime();
+      if (sort === "cheapest") {
+        const ap = Math.min(a.prices.vip, a.prices.regular, a.prices.economy);
+        const bp = Math.min(b.prices.vip, b.prices.regular, b.prices.economy);
+        return ap - bp;
+      }
+      const aa = a.ticketsAvailable.vip + a.ticketsAvailable.regular + a.ticketsAvailable.economy;
+      const ba = b.ticketsAvailable.vip + b.ticketsAvailable.regular + b.ticketsAvailable.economy;
+      return ba - aa;
+    });
+
+    return sorted;
+  }, [matches, query, stage, city, sort]);
+
+  const clearFilters = () => {
+    setQuery("");
+    setStage("All");
+    setCity("All");
+    setSort("soonest");
+  };
 
   return (
     <div className="min-h-screen bg-muted/30">
       <div className="border-b border-border bg-card">
-        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-          <div className="flex h-14 items-center justify-between gap-4">
-            <div className="flex items-center gap-1">
-              <Link to="/" className="px-3 sm:px-4 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors">About</Link>
-              <button className="px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold text-foreground bg-secondary">TV schedules</button>
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10">
+          <div className="flex flex-col gap-6">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-foreground">Browse Matches</h1>
+                <p className="mt-2 text-sm text-muted-foreground">Choose a match, pick your section, and pay with crypto.</p>
+              </div>
+              <Link
+                to="/"
+                className="hidden sm:inline-flex items-center rounded-xl border border-border bg-background px-4 py-2 text-sm font-semibold text-foreground hover:bg-secondary/50"
+              >
+                Back home
+              </Link>
             </div>
-            <div className="flex items-center gap-1">
-              <button aria-label="Settings" className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-secondary hover:text-foreground"><Settings className="h-4 w-4" /></button>
-              <button aria-label="Apple app" className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-secondary hover:text-foreground"><Apple className="h-4 w-4" /></button>
-              <button aria-label="Android app" className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-secondary hover:text-foreground"><Smartphone className="h-4 w-4" /></button>
+
+            <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Search teams, city, stadium, stage…"
+                  className="w-full rounded-xl border border-border bg-background pl-9 pr-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
+                />
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setFiltersOpen(v => !v)}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-background px-4 py-2.5 text-sm font-semibold text-foreground hover:bg-secondary/50"
+                >
+                  <SlidersHorizontal className="h-4 w-4" />
+                  Filters
+                </button>
+                <button
+                  onClick={clearFilters}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-background px-4 py-2.5 text-sm font-semibold text-foreground hover:bg-secondary/50"
+                >
+                  <X className="h-4 w-4" />
+                  Reset
+                </button>
+              </div>
+            </div>
+
+            {filtersOpen && (
+              <div className="rounded-xl border border-border bg-background p-4 grid gap-4 sm:grid-cols-3">
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground">Stage</label>
+                  <select
+                    value={stage}
+                    onChange={(e) => setStage(e.target.value)}
+                    className="mt-2 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
+                  >
+                    {stageOptions.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground">City</label>
+                  <select
+                    value={city}
+                    onChange={(e) => setCity(e.target.value)}
+                    className="mt-2 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
+                  >
+                    {cityOptions.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground">Sort</label>
+                  <select
+                    value={sort}
+                    onChange={(e) => setSort(e.target.value as SortKey)}
+                    className="mt-2 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
+                  >
+                    <option value="soonest">Soonest</option>
+                    <option value="cheapest">Lowest price</option>
+                    <option value="availability">Most available</option>
+                  </select>
+                </div>
+              </div>
+            )}
+
+            <div className="flex items-center justify-between text-sm text-muted-foreground">
+              <span>{dbMatches ? `${filtered.length} match${filtered.length !== 1 ? "es" : ""}` : "Loading matches…"}</span>
+              <span>Times shown in your local timezone ({detectedTZ})</span>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
-        {/* Header w/ timezone */}
-        <div className="mb-6 flex flex-col items-center gap-3 text-center">
-          <div className="inline-flex flex-wrap items-center justify-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground shadow-sm">
-            <Globe2 className="h-3.5 w-3.5" />
-            <span>Times in your local timezone</span>
-            <span className="px-1.5 py-0.5 rounded bg-secondary font-semibold text-foreground">{tz}</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <button onClick={() => setRoundIdx(Math.max(0, roundIdx - 1))} disabled={roundIdx === 0} aria-label="Previous round" className="flex h-10 w-10 items-center justify-center rounded-full border border-border bg-card text-foreground shadow-sm transition hover:bg-secondary disabled:opacity-40 disabled:cursor-not-allowed">
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-            <div className="relative">
-              <button onClick={() => setDropdownOpen(v => !v)} className="flex items-center gap-2 rounded-full border border-border bg-card px-5 py-2 text-sm font-semibold text-foreground shadow-sm hover:bg-secondary transition">
-                {round?.label ?? "Round 1"}
-                <ChevronDown className={`h-4 w-4 transition-transform ${dropdownOpen ? "rotate-180" : ""}`} />
-              </button>
-              {dropdownOpen && (
-                <div className="absolute left-1/2 -translate-x-1/2 mt-2 min-w-[160px] rounded-xl border border-border bg-card shadow-lg overflow-hidden z-10">
-                  {ROUND_RANGES.map((r, i) => (
-                    <button key={r.label} onClick={() => { setRoundIdx(i); setDropdownOpen(false); }} className={`w-full px-4 py-2.5 text-sm text-left hover:bg-secondary ${i === roundIdx ? "font-semibold text-primary" : "text-foreground"}`}>
-                      {r.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-            <button onClick={() => setRoundIdx(Math.min(ROUND_RANGES.length - 1, roundIdx + 1))} disabled={roundIdx >= ROUND_RANGES.length - 1} aria-label="Next round" className="flex h-10 w-10 items-center justify-center rounded-full border border-border bg-card text-foreground shadow-sm transition hover:bg-secondary disabled:opacity-40 disabled:cursor-not-allowed">
-              <ChevronRight className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
-
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10">
         {!dbMatches ? (
-          <div className="flex items-center justify-center py-16 text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin mr-2" /> Loading schedule…</div>
-        ) : !round || round.days.length === 0 ? (
-          <div className="text-center py-16 text-muted-foreground text-sm">No matches scheduled for this round.</div>
+          <div className="flex items-center justify-center py-16 text-muted-foreground">
+            <Loader2 className="h-5 w-5 animate-spin mr-2" /> Loading matches…
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="rounded-2xl border border-border bg-card p-10 text-center">
+            <p className="text-lg font-bold text-foreground">No matches found</p>
+            <p className="mt-2 text-sm text-muted-foreground">Try changing filters or search terms.</p>
+            <button
+              onClick={clearFilters}
+              className="mt-6 inline-flex items-center justify-center rounded-xl bg-gradient-primary px-6 py-3 text-sm font-bold text-primary-foreground shadow-glow-primary hover:opacity-90"
+            >
+              Reset filters
+            </button>
+          </div>
         ) : (
-          <div className="max-w-2xl mx-auto space-y-4">
-            {round.days.map(day => (
-              <section key={day.date} className="rounded-xl border border-border bg-card overflow-hidden shadow-sm">
-                <header className="px-4 py-2.5 bg-muted/50 border-b border-border">
-                  <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    {day.date}
-                  </h2>
-                </header>
-                <div className="divide-y divide-border">
-                  {day.matches.map(m => <MatchRow key={m.id} match={m} />)}
-                </div>
-              </section>
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {filtered.map((m, i) => (
+              <MatchCard key={m.id} match={m} index={i} />
             ))}
           </div>
         )}

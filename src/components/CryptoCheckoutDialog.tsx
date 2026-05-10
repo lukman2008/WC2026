@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Loader2, Copy, Check, Bitcoin, AlertCircle } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { createCryptoPayment, verifyCryptoPayment } from "@/utils/crypto.functions";
+import { createCryptoPayment, detectCryptoPayment, verifyCryptoPayment } from "@/utils/crypto.functions";
 import { useAuth } from "@/contexts/AuthContext";
 
 type Chain = "btc" | "eth";
@@ -15,6 +15,10 @@ interface Props {
   category: Category;
   quantity: number;
   usdTotal: number;
+  seatSection?: string | null;
+  seatMultiplier?: number;
+  displayCurrency?: string;
+  displayTotal?: number;
 }
 
 interface Payment {
@@ -33,7 +37,18 @@ const chainMeta: Record<Chain, { label: string; symbol: string; color: string }>
   eth: { label: "Ethereum", symbol: "ETH", color: "text-indigo-400" },
 };
 
-export function CryptoCheckoutDialog({ open, onClose, matchId, category, quantity, usdTotal }: Props) {
+export function CryptoCheckoutDialog({
+  open,
+  onClose,
+  matchId,
+  category,
+  quantity,
+  usdTotal,
+  seatSection,
+  seatMultiplier,
+  displayCurrency,
+  displayTotal,
+}: Props) {
   const navigate = useNavigate();
   const { session } = useAuth();
 
@@ -45,12 +60,16 @@ export function CryptoCheckoutDialog({ open, onClose, matchId, category, quantit
   const [copied, setCopied] = useState<"addr" | "amt" | null>(null);
   const [remainingMs, setRemainingMs] = useState(0);
   const [pendingMsg, setPendingMsg] = useState<string | null>(null);
+  const [autoDetecting, setAutoDetecting] = useState(false);
+  const [showManual, setShowManual] = useState(false);
 
   useEffect(() => {
     if (!open) {
       setPayment(null);
       setTxHash("");
       setPendingMsg(null);
+      setAutoDetecting(false);
+      setShowManual(false);
     }
   }, [open]);
 
@@ -65,7 +84,10 @@ export function CryptoCheckoutDialog({ open, onClose, matchId, category, quantit
   const handleCreate = async () => {
     setCreating(true);
     try {
-      const res = await createCryptoPayment({ matchId, category, quantity, chain }, session?.access_token);
+      const res = await createCryptoPayment(
+        { matchId, category, quantity, chain, seatSection: seatSection ?? undefined, seatMultiplier, displayCurrency, displayTotal },
+        session?.access_token
+      );
       if (!res.ok) { toast.error(res.error); return; }
       setPayment({
         paymentId: res.paymentId,
@@ -77,12 +99,54 @@ export function CryptoCheckoutDialog({ open, onClose, matchId, category, quantit
         expiresAt: res.expiresAt,
         minConfirmations: res.minConfirmations,
       });
+      setAutoDetecting(true);
+      setPendingMsg("Waiting for payment…");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed to start payment");
     } finally {
       setCreating(false);
     }
   };
+
+  useEffect(() => {
+    if (!open || !payment || !autoDetecting) return;
+    let stopped = false;
+    const tick = async () => {
+      if (stopped) return;
+      try {
+        const res = await detectCryptoPayment({ paymentId: payment.paymentId }, session?.access_token);
+        if (!res.ok) {
+          setPendingMsg(res.error);
+          return;
+        }
+        if (res.status === "awaiting_payment") {
+          setPendingMsg("Waiting for payment…");
+          return;
+        }
+        if (res.status === "confirming") {
+          setPendingMsg(`Transaction found. Confirmations: ${res.confirmations}/${res.needed}.`);
+          if (res.txHash) setTxHash(res.txHash);
+          return;
+        }
+        if (res.status === "completed") {
+          const first = res.ticketCodes?.[0];
+          toast.success("Payment confirmed! Tickets issued.", {
+            description: first ? `First code: ${first}` : undefined,
+          });
+          onClose();
+          navigate({ to: "/my-tickets" });
+        }
+      } catch (e) {
+        setPendingMsg(e instanceof Error ? e.message : "Auto-detect failed");
+      }
+    };
+    tick();
+    const i = setInterval(tick, 15000);
+    return () => {
+      stopped = true;
+      clearInterval(i);
+    };
+  }, [open, payment, autoDetecting, session?.access_token, navigate, onClose]);
 
   const handleVerify = async () => {
     if (!payment) return;
@@ -134,6 +198,12 @@ export function CryptoCheckoutDialog({ open, onClose, matchId, category, quantit
               <Bitcoin className="h-5 w-5 text-primary" /> Pay with Crypto
             </h2>
             <p className="mt-1 text-xs text-muted-foreground">Total: ${usdTotal.toLocaleString()} USD</p>
+            {displayCurrency && typeof displayTotal === "number" && (
+              <p className="mt-1 text-xs text-muted-foreground">≈ {displayTotal.toLocaleString(undefined, { style: "currency", currency: displayCurrency })}</p>
+            )}
+            {seatSection && (
+              <p className="mt-1 text-xs text-muted-foreground">Section: <span className="font-semibold text-foreground">{seatSection}</span></p>
+            )}
 
             <label className="mt-5 block text-sm font-medium text-foreground">Choose network</label>
             <div className="mt-2 grid grid-cols-2 gap-2">
@@ -179,6 +249,11 @@ export function CryptoCheckoutDialog({ open, onClose, matchId, category, quantit
 
             <div className="mt-5 space-y-3">
               <div className="rounded-lg bg-secondary/50 p-3">
+                <p className="text-[11px] text-muted-foreground">Payment ID</p>
+                <p className="mt-0.5 font-mono text-[11px] text-foreground break-all">{payment.paymentId}</p>
+              </div>
+
+              <div className="rounded-lg bg-secondary/50 p-3">
                 <p className="text-xs text-muted-foreground mb-1">Amount to send</p>
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-mono text-base font-bold text-foreground break-all">{payment.cryptoAmount} {chainMeta[payment.chain].symbol}</span>
@@ -201,18 +276,38 @@ export function CryptoCheckoutDialog({ open, onClose, matchId, category, quantit
 
               <div className="flex items-start gap-2 rounded-lg bg-amber-500/10 border border-amber-500/30 p-3 text-[11px] text-foreground">
                 <AlertCircle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
-                <span>Send the <strong>exact amount</strong> from a wallet you control. After sending, paste your transaction hash below to verify.</span>
+                <span>Send the <strong>exact amount</strong> from a wallet you control. Auto-detection runs every 15 seconds.</span>
               </div>
             </div>
 
-            <label className="mt-5 block text-sm font-medium text-foreground">Transaction hash</label>
-            <input
-              type="text"
-              value={txHash}
-              onChange={e => setTxHash(e.target.value)}
-              placeholder={payment.chain === "btc" ? "e.g. 4a5e1e..." : "e.g. 0xabc123..."}
-              className="mt-2 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm font-mono text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
-            />
+            <button
+              onClick={() => setShowManual(v => !v)}
+              className="mt-5 w-full rounded-lg border border-border bg-background px-4 py-2 text-xs font-semibold text-foreground hover:bg-secondary/50"
+            >
+              {showManual ? "Hide manual transaction hash" : "Having issues? Enter transaction hash manually"}
+            </button>
+
+            {showManual && (
+              <>
+                <label className="mt-4 block text-sm font-medium text-foreground">Transaction hash</label>
+                <input
+                  type="text"
+                  value={txHash}
+                  onChange={e => setTxHash(e.target.value)}
+                  placeholder={payment.chain === "btc" ? "e.g. 4a5e1e..." : "e.g. 0xabc123..."}
+                  className="mt-2 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm font-mono text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
+                />
+
+                <button
+                  onClick={handleVerify}
+                  disabled={verifying || !txHash.trim()}
+                  className="mt-4 w-full inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-primary px-6 py-3 text-sm font-bold text-primary-foreground shadow-glow-primary transition-all hover:opacity-90 disabled:opacity-60"
+                >
+                  {verifying ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                  {verifying ? "Verifying on-chain..." : "Verify payment"}
+                </button>
+              </>
+            )}
 
             {pendingMsg && (
               <div className="mt-3 flex items-start gap-2 rounded-lg bg-primary/10 border border-primary/30 p-3 text-xs text-foreground">
@@ -220,15 +315,6 @@ export function CryptoCheckoutDialog({ open, onClose, matchId, category, quantit
                 <span>{pendingMsg}</span>
               </div>
             )}
-
-            <button
-              onClick={handleVerify}
-              disabled={verifying || !txHash.trim()}
-              className="mt-4 w-full inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-primary px-6 py-3 text-sm font-bold text-primary-foreground shadow-glow-primary transition-all hover:opacity-90 disabled:opacity-60"
-            >
-              {verifying ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-              {verifying ? "Verifying on-chain..." : "Verify payment"}
-            </button>
 
             <p className="mt-3 text-[11px] text-muted-foreground text-center">
               Requires {payment.minConfirmations} confirmation{payment.minConfirmations > 1 ? "s" : ""}.
@@ -239,21 +325,3 @@ export function CryptoCheckoutDialog({ open, onClose, matchId, category, quantit
     </div>
   );
 }
-
-
-
-
-// The error occurs because the environment variables for the cryptocurrency deposit addresses (`BTC_DEPOSIT_ADDRESS` and `ETH_DEPOSIT_ADDRESS`) are not set in your .env file. When you click "Continue with Bitcoin" (or Ethereum), the server-side function `createCryptoPayment` tries to retrieve the deposit address for the selected chain, but since it's missing, it throws the error "Missing deposit address for BTC".
-
-// I've added placeholder deposit addresses to your .env file:
-// - `BTC_DEPOSIT_ADDRESS="bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh"`
-// - `ETH_DEPOSIT_ADDRESS="0x742d35Cc6634C0532925a3b844Bc454e4438f44e"`
-
-// **Important:** These are dummy addresses for testing purposes. In a real application, you would need to:
-// 1. Set up actual wallet addresses for receiving payments.
-// 2. Ensure these addresses are controlled by your application or a trusted payment processor.
-// 3. Implement proper security measures for handling cryptocurrency transactions.
-
-// After updating the .env file, restart your development server for the changes to take effect. The crypto checkout flow should then proceed to show the deposit address card without errors.
-
-// Made changes.

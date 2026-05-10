@@ -7,6 +7,10 @@ const createInput = z.object({
   category: z.enum(["vip", "regular", "economy"]),
   quantity: z.number().int().min(1).max(10),
   chain: z.enum(["btc", "eth"]),
+  seatSection: z.string().min(1).max(80).optional(),
+  seatMultiplier: z.number().min(0.8).max(2.0).optional(),
+  displayCurrency: z.string().min(3).max(6).optional(),
+  displayTotal: z.number().min(0).optional(),
 });
 
 const PAYMENT_TTL_MS = 30 * 60 * 1000; // 30 min
@@ -67,20 +71,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const token = authHeader.split(" ")[1];
 
     const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-    const supabaseKey =
-      process.env.SUPABASE_SERVICE_ROLE_KEY ||
-      process.env.SUPABASE_PUBLISHABLE_KEY ||
-      process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const anonKey = process.env.SUPABASE_PUBLISHABLE_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
-    if (!supabaseUrl || !supabaseKey) {
+    if (!supabaseUrl || (!serviceRoleKey && !anonKey)) {
       console.error("Missing Supabase environment variables");
       return res.status(500).json({ error: "Server configuration error: Missing database credentials" });
     }
 
-    const supabase = createClient(supabaseUrl, supabaseKey);
-
-    const { data: { user }, error: authErr } = await supabase.auth.getUser(token);
+    const authClient = createClient(supabaseUrl, serviceRoleKey || anonKey!);
+    const { data: { user }, error: authErr } = await authClient.auth.getUser(token);
     if (authErr || !user) return res.status(401).json({ error: "Invalid token" });
+
+    const supabase = serviceRoleKey
+      ? createClient(supabaseUrl, serviceRoleKey)
+      : createClient(supabaseUrl, anonKey!, {
+          global: { headers: { Authorization: `Bearer ${token}` } },
+          auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+        });
 
     const body = createInput.parse(req.body);
     console.log("Parsed request body:", body);
@@ -109,7 +117,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: `Only ${availMap[body.category]} ${body.category} tickets left.` });
     }
 
-    const usd = +(priceMap[body.category] * body.quantity).toFixed(2);
+    const seatMultiplier = body.seatMultiplier ?? 1;
+    const usd = +(priceMap[body.category] * body.quantity * seatMultiplier).toFixed(2);
     console.log(`Calculating payment for ${body.quantity} ${body.category} tickets. USD Total: ${usd}`);
 
     const rate = await getUsdRate(body.chain);
@@ -121,9 +130,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     console.log("Attempting to insert crypto_payment record...");
 
-    const { data: row, error: insErr } = await supabase
-      .from("crypto_payments")
-      .insert({
+    const payloadWithExtras: any = {
+      user_id: user.id,
+      match_id: body.matchId,
+      category: body.category,
+      quantity: body.quantity,
+      chain: body.chain,
+      deposit_address: depositAddress,
+      usd_amount: usd,
+      crypto_amount: cryptoAmount,
+      rate_usd_per_unit: rate,
+      seat_section: body.seatSection ?? null,
+      seat_multiplier: body.seatMultiplier ?? null,
+      display_currency: body.displayCurrency ?? null,
+      display_total: body.displayTotal ?? null,
+      expires_at: expiresAt,
+    };
+
+    let insertRes = await supabase.from("crypto_payments").insert(payloadWithExtras).select("id").single();
+    if (insertRes.error?.message?.includes("schema cache")) {
+      const payloadBase: any = {
         user_id: user.id,
         match_id: body.matchId,
         category: body.category,
@@ -134,9 +160,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         crypto_amount: cryptoAmount,
         rate_usd_per_unit: rate,
         expires_at: expiresAt,
-      })
-      .select("id")
-      .single();
+      };
+      insertRes = await supabase.from("crypto_payments").insert(payloadBase).select("id").single();
+    }
+
+    const { data: row, error: insErr } = insertRes;
 
     if (insErr || !row) {
       console.error("Database error inserting crypto_payment:", insErr);
